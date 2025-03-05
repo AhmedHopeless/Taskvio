@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 void main() {
@@ -11,29 +10,40 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Login Screen',
       theme: ThemeData(
-        primaryColor: Color(0xFF133E87), 
-        scaffoldBackgroundColor: Color.fromARGB(255, 255, 255, 255), 
+        primaryColor: Color(0xFF133E87), // Primary color set to #133E87
       ),
       home: LoginScreen(),
     );
   }
 }
 
-class LoginScreen extends StatelessWidget {
+
+class LoginScreen extends StatefulWidget {
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool _obscureText = true;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Sign in your account', style: TextStyle(color: Colors.white)),
+        title: Text('Sign in to your Account', style: TextStyle(color: Colors.white)),
+        
         backgroundColor: Color(0xFF133E87), 
       ),
-      body: Padding(
+      body: Container(
+        color: Colors.white, 
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            
-            SizedBox(height: 20),
+          
+            SizedBox(height: 20), 
+
+           
             TextField(
               decoration: InputDecoration(
                 labelText: 'Email',
@@ -44,9 +54,11 @@ class LoginScreen extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: 10),
+            SizedBox(height: 10), // Space after email field
+
+            // Password Field
             TextField(
-              obscureText: true,
+              obscureText: _obscureText, // Use _obscureText here
               decoration: InputDecoration(
                 labelText: 'Password',
                 labelStyle: TextStyle(color: Color(0xFF133E87)),
@@ -54,55 +66,181 @@ class LoginScreen extends StatelessWidget {
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF133E87)),
                 ),
-              ),
-            ),
-            SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                // Handle forgot password
-              },
-              child: Text('Forgot Password?', style: TextStyle(color: Color(0xFF133E87))),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                // Handle login
-              },
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white, backgroundColor: Color(0xFF133E87), 
-              ),
-              child: Text('Login'),
-            ),
-            SizedBox(height: 20),
-            Text('Or login with', style: TextStyle(color: Color(0xFF133E87))),
-            SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                IconButton(
-                  icon: Image.asset('google.png'),
-                  onPressed: () {
-                
+                suffixIcon: IconButton(
+                  icon: Image.asset(
+                    _obscureText ? 'icons/hidden.png' : 'icons/visible.png', // Custom icons
+                    width: 24,
+                    height: 24,
+                  ),
+                     onPressed: () {
+                    setState(() {
+                      _obscureText = !_obscureText; // Toggle visibility
+                    });
                   },
                 ),
-                IconButton(
-                  icon: Image.asset('facebook.png'),
-                  onPressed: () {
-                    
-                  },
+              ),
+            ),
+            SizedBox(height: 10), // Space after password field
+
+            // Forgot Password
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  // Handle forgot password
+                },
+                child: Text(
+                  'Forgot Password?',
+                  style: TextStyle(color: Color(0xFF133E87)),
+                ),
+              ),
+            ),
+            SizedBox(height: 20), // Space after forgot password
+
+            // Login Button
+            SizedBox(
+              width: double.infinity, // Full-width button
+              child: ElevatedButton(
+                onPressed: () {
+                  // Handle login
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white, backgroundColor: Color(0xFF133E87), // Text color set to white
+                  padding: EdgeInsets.symmetric(vertical: 16), // Button height
+                ),
+                child: Text('Login'),
+              ),
+            ),
+            SizedBox(height: 20), // Space after login button
+
+            // Divider with "Or login with"
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Divider(
+                    color: Colors.grey, // Gray split line
+                    thickness: 1,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text(
+                    'Or login with',
+                    style: TextStyle(color: Colors.grey), // Gray text
+                  ),
+                ),
+                Expanded(
+                  child: Divider(
+                    color: Colors.grey, // Gray split line
+                    thickness: 1,
+                  ),
                 ),
               ],
             ),
-            SizedBox(height: 20),
+            SizedBox(height: 20), // Space after divider
+
+            // Google and Facebook Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                // Google Button
+                ElevatedButton(
+                  onPressed: () {
+                    _handleGoogleLogin(); // Handle Google login
+                  },
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.black, backgroundColor: Colors.white, // Text color set to black
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Button padding
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4), // Rounded corners
+                      side: BorderSide(color: Colors.grey), // Gray border
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        'icons/google.png', // Google icon
+                        width: 24,
+                        height: 24,
+                      ),
+                      SizedBox(width: 8), // Space between icon and text
+                      Text(
+                        'Google',
+                        style: TextStyle(
+                          fontSize: 14, // Smaller font size
+                          color: Colors.black, // Text color set to black
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 16), // Space between Google and Facebook
+                // Facebook Button
+                ElevatedButton(
+                  onPressed: () {
+                    _handleFacebookLogin(); // Handle Facebook login
+                  },
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.black, backgroundColor: Colors.white, // Text color set to black
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Button padding
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4), // Rounded corners
+                      side: BorderSide(color: Colors.grey), // Gray border
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        'icons/facebook.png', // Facebook icon
+                        width: 24,
+                        height: 24,
+                      ),
+                      SizedBox(width: 8), // Space between icon and text
+                      Text(
+                        'Facebook',
+                        style: TextStyle(
+                          fontSize: 14, // Smaller font size
+                          color: Colors.black, // Text color set to black
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 20), // Space after buttons
+
+            // "Don't have an account? Register"
             TextButton(
               onPressed: () {
                 // Handle registration
               },
-              child: Text('Don\'t have an account? Register', style: TextStyle(color: Color(0xFF133E87))),
+              child: Text(
+                'Don\'t have an account? Register',
+                style: TextStyle(
+                  color: Color(0xFF133E87), // Text color set to #133E87
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  // Function to handle Google login
+  void _handleGoogleLogin() {
+    print('Google login pressed');
+    // Add your Google login logic here
+  }
+
+  // Function to handle Facebook login
+  void _handleFacebookLogin() {
+    print('Facebook login pressed');
+    // Add your Facebook login logic here
+  }
 }
+
+
+
+
