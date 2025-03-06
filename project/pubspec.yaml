@@ -16,6 +16,9 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^2.0.0
 
-assets:
-  -icons/google.png
-  -icons/facebook.png
+flutter:
+  assets:
+    - assets/icons/hidden.png
+    - assets/icons/google.png
+    - assets/icons/facebook.png
+    - assets/icons/visible.png
