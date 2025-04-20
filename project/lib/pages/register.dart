@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -8,115 +9,143 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _repeatPasswordController = TextEditingController();
   bool _isPasswordVisible = false;
+
+  Future<void> _signUp() async {
+  final name = _nameController.text;
+  final email = _emailController.text;
+  final password = _passwordController.text;
+  final repeatPassword = _repeatPasswordController.text;
+
+  if (name.isEmpty || email.isEmpty || password.isEmpty || repeatPassword.isEmpty) {
+    _showSnackBar("Please fill all fields");
+    return;
+  }
+
+  if (password != repeatPassword) {
+    _showSnackBar("Passwords do not match");
+    return;
+  }
+
+  try {
+    // Sign up using Supabase Auth
+    final response = await Supabase.instance.client.auth.signUp(
+      email: email,
+      password: password,
+    );
+
+    if (response.error != null) {
+      // Handle error during sign-up
+      _showSnackBar("Error signing up: ${response.error!.message}");
+      return;
+    }
+
+    if (response.user != null) {
+      // Insert into profiles table
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final profileResponse = await Supabase.instance.client
+          .from('profiles')
+          .insert({
+            'user_id': userId,
+            'name': name,
+            'email': email,
+            'password': password, // Avoid storing plain passwords in production
+          })
+          .select();
+
+      if (profileResponse.error != null) {
+        _showSnackBar("Error inserting into profiles: ${profileResponse.error!.message}");
+        return;
+      }
+
+      // Show success popup
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Success'),
+          content: Text('Account successfully created!'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+                Navigator.pushNamed(context, '/login'); // Redirect to login page
+              },
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  } catch (e) {
+    _showSnackBar("An error occurred: $e");
+  }
+}
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
+      appBar: AppBar(
+        title: Text('Register'),
+        backgroundColor: Color(0xFF133E87),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: EdgeInsets.only(top: 50, left: 20),
-              color: Color(0xFF0A3875),
-              height: 180,
-              width: double.infinity,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      icon: Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/login');
-                      },
-                    ),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(labelText: 'Name'),
+            ),
+            TextField(
+              controller: _emailController,
+              decoration: InputDecoration(labelText: 'Email'),
+            ),
+            TextField(
+              controller: _passwordController,
+              obscureText: !_isPasswordVisible,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                   ),
-                  SizedBox(height: 15),
-                  Text(
-                    "Register",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    "Create your account",
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                ],
+                  onPressed: () {
+                    setState(() {
+                      _isPasswordVisible = !_isPasswordVisible;
+                    });
+                  },
+                ),
               ),
             ),
-            Padding(
-              padding: EdgeInsets.all(20),
-
-              child: Column(
-                children: [
-                  SizedBox(height: 40),
-                  _buildTextField("Full Name", false),
-                  SizedBox(height: 20),
-                  _buildTextField("Email", false),
-                  SizedBox(height: 20),
-                  _buildTextField("Password", true),
-                  SizedBox(height: 20),
-                  _buildTextField("Repeat Password", true),
-                  SizedBox(height: 50),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 60,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF0A3875),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                      child: Text(
-                        "Register",
-                        style: TextStyle(fontSize: 18, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            TextField(
+              controller: _repeatPasswordController,
+              obscureText: true,
+              decoration: InputDecoration(labelText: 'Repeat Password'),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _signUp,
+              child: Text('Sign Up'),
             ),
           ],
         ),
       ),
     );
   }
- Widget _buildTextField(String label, bool isPassword) {
-    return TextField(
-      style: TextStyle(height: 1.8),
-      obscureText: isPassword && !_isPasswordVisible,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: Colors.black54),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(5),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                  color: Colors.black54,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _isPasswordVisible = !_isPasswordVisible;
-                  });
-                },
-              )
-            : null,
-      ),
-    );
-  }
+}
+
+extension on PostgrestList {
+  get error => null;
+}
+
+extension on AuthResponse {
+  get error => null;
 }

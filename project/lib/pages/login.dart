@@ -106,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () {
-                  // Handle forgot password
+                  Navigator.pushNamed(context, '/forgotpassword');
                 },
                 child: Text(
                   'Forgot Password?',
@@ -121,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
               width: double.infinity, // Full-width button
               child: ElevatedButton(
                 onPressed: () {
-                  // Handle login
+                  Navigator.pushNamed(context, '/dashboard');
                 },
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
