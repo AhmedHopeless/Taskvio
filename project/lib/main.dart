@@ -5,6 +5,7 @@ import 'package:project/pages/forgotPassword.dart';
 import 'package:project/pages/resetPassword.dart';
 import 'package:project/pages/sixDigit.dart';
 import 'package:project/pages/dashboard.dart';
+import 'package:project/pages/teams.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 void main() async {
   await Supabase.initialize(
@@ -30,6 +31,7 @@ class MyApp extends StatelessWidget {
         '/sixdigit': (context) => SixDigitScreen(),
         '/resetpassword': (context) => Resetpassword(),
         '/dashboard': (context) => Dashboard(),
+        '/teams': (context) => TeamsScreen(),
       },
     );
   }

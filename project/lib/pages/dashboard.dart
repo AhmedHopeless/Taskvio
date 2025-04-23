@@ -10,33 +10,39 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardScreenState extends State<Dashboard> {
   final Color primaryColor = Color(0xFF133E87);
+int _currentIndex = 0; // Track the selected index
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      bottomNavigationBar: BottomNavigationBar(
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Calendar',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Teams'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.gps_fixed_rounded),
-            label: 'Focus Mode',
-          ),
-        ],
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.grey,
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+  backgroundColor: Colors.white,
+  bottomNavigationBar: BottomNavigationBar(
+    currentIndex: _currentIndex, // Set the current index
+    onTap: (index) {
+      setState(() {
+        _currentIndex = index; // Update the selected index
+      });
+
+      // Handle navigation based on the selected index
+      if (index == 2) { // Index for "Teams"
+        Navigator.pushNamed(context, '/teams');
+      }
+    },
+    items: [
+      BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+      BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
+      BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Teams'), // Teams item
+      BottomNavigationBarItem(icon: Icon(Icons.gps_fixed_rounded), label: 'Focus Mode'),
+    ],
+    selectedItemColor: Color(0xFF133E87), // Primary color
+    unselectedItemColor: Colors.grey,
+  ),
+  body: SingleChildScrollView( // Wrap the body in SingleChildScrollView
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
               // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

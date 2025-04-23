@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Email Confirmed</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding-top: 100px;
+      background-color: #f5f7fa;
+    }
+    h1 {
+      color: #2e7d32;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.1rem;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      font-weight: bold;
+      color: #1976d2;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Email Confirmation</h1>
+  <p id="status">Processing your confirmation...</p>
+
+  <script>
+    const SUPABASE_URL = 'https://msfnqnwhkmejglouqhqp.supabase.co/';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zZm5xbndoa21lamdsb3VxaHFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNzYxODQsImV4cCI6MjA2MDc1MjE4NH0.QnJ63Z37LOpaIU9e3mP49nr1zxOsJVbu8u6_mSRX_c8';
+
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function confirmEmail() {
+      const urlParams = new URLSearchParams(window.location.hash.substring(1));
+      const access_token = urlParams.get('access_token');
+      const refresh_token = urlParams.get('refresh_token');
+      const type = urlParams.get('type');
+      const statusText = document.getElementById('status');
+
+      if (type === 'signup' && access_token && refresh_token) {
+        const { error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token
+        });
+
+        if (error) {
+          statusText.textContent = '❌ Error confirming email: ${error.message}';
+        } else {
+          statusText.textContent = '✅ Your email has been confirmed! You can now return to the app.';
+        }
+      } else {
+        statusText.textContent = '⚠️ Invalid or missing confirmation parameters.';
+      }
+    }
+
+    confirmEmail();
+  </script>
+</body>
+</html>

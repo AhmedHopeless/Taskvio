@@ -16,77 +16,70 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isPasswordVisible = false;
 
   Future<void> _signUp() async {
-  final name = _nameController.text;
-  final email = _emailController.text;
-  final password = _passwordController.text;
-  final repeatPassword = _repeatPasswordController.text;
+    final name = _nameController.text;
+    final email = _emailController.text;
+    final password = _passwordController.text;
+    final repeatPassword = _repeatPasswordController.text;
 
-  if (name.isEmpty || email.isEmpty || password.isEmpty || repeatPassword.isEmpty) {
-    _showSnackBar("Please fill all fields");
-    return;
-  }
-
-  if (password != repeatPassword) {
-    _showSnackBar("Passwords do not match");
-    return;
-  }
-
-  try {
-    // Sign up using Supabase Auth
-    final response = await Supabase.instance.client.auth.signUp(
-      email: email,
-      password: password,
-    );
-
-    if (response.error != null) {
-      // Handle error during sign-up
-      _showSnackBar("Error signing up: ${response.error!.message}");
+    if (name.isEmpty || email.isEmpty || password.isEmpty || repeatPassword.isEmpty) {
+      _showSnackBar("Please fill all fields");
       return;
     }
 
-    if (response.user != null) {
-      // Insert into profiles table
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      final profileResponse = await Supabase.instance.client
-          .from('profiles')
-          .insert({
-            'user_id': userId,
-            'name': name,
-            'email': email,
-            'password': password, // Avoid storing plain passwords in production
-          })
-          .select();
-
-      if (profileResponse.error != null) {
-        _showSnackBar("Error inserting into profiles: ${profileResponse.error!.message}");
-        return;
-      }
-
-      // Show success popup
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Success'),
-          content: Text('Account successfully created!'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close the dialog
-                Navigator.pushNamed(context, '/login'); // Redirect to login page
-              },
-              child: Text('OK'),
-            ),
-          ],
-        ),
-      );
+    if (password != repeatPassword) {
+      _showSnackBar("Passwords do not match");
+      return;
     }
-  } catch (e) {
-    _showSnackBar("An error occurred: $e");
+
+    try {
+      final response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        emailRedirectTo: 'http://taskvio.ct.ws/Email_confirm.html'
+      );
+
+      final user = response.user;
+
+      if (user != null) {
+        final userId = user.id;
+        final profileResponse = await Supabase.instance.client
+            .from('profiles')
+            .insert({
+              'user_id': userId,
+              'name': name,
+              'email': email,
+              'password': password, // Do not store plain passwords in production
+            })
+            .select();
+
+        _showDialog('Success', 'Account successfully created! Please check your email to confirm.');
+      }
+    } catch (e) {
+      _showSnackBar("An error occurred: $e");
+    }
   }
-}
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/login');
+            },
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -142,10 +135,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-extension on PostgrestList {
-  get error => null;
-}
 
-extension on AuthResponse {
-  get error => null;
-}

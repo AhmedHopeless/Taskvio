@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -9,265 +9,283 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscureText = true;
 
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      
-      resizeToAvoidBottomInset: false, // Prevents the body from resizing
+      resizeToAvoidBottomInset: false,
       body: SingleChildScrollView(
         child: Container(
           color: Colors.white,
-          // padding: const EdgeInsets.all(16.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Container(
-              padding: EdgeInsets.only(top: 50, left: 20),
-              color: Color(0xFF0A3875),
-              height: 180,
-              width: double.infinity,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: 15),
-                  Text(
-                    "Sign in to your",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                  Text(
-                    "Account",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                  Text(
-                    "Welcome back!",
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-
-              SizedBox(height: 70),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  labelStyle: TextStyle(color: Color(0xFF133E87)),
-                  border: OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF133E87)),
-                  ),
-                ),
-              ),
-
-            SizedBox(height: 30), // Space after email field
-
-            // Password Field
-            TextField(
-              obscureText: _obscureText, // Use _obscureText here
-              decoration: InputDecoration(
-                labelText: 'Password',
-                labelStyle: TextStyle(color: Color(0xFF133E87)),
-                border: OutlineInputBorder(),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF133E87)),
-                ),
-                suffixIcon: IconButton(
-                  icon: Image.asset(
-                    _obscureText
-                        ? 'assets/icons/hidden.png'
-                        : 'assets/icons/visible.png', // Custom icons
-                    width: 24,
-                    height: 24,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureText = !_obscureText; // Toggle visibility
-                    });
-                  },
-                ),
-              ),
-            ),
-            SizedBox(height: 1), // Space after password field
-
-            // Forgot Password
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/forgotpassword');
-                },
-                child: Text(
-                  'Forgot Password?',
-                  style: TextStyle(color: Color(0xFF133E87)),
-                ),
-              ),
-            ),
-            SizedBox(height: 20), // Space after forgot password
-
-            // Login Button
-            SizedBox(
-              width: double.infinity, // Full-width button
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/dashboard');
-                },
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Color(0xFF133E87), // Text color set to white
-                  padding: EdgeInsets.symmetric(vertical: 16), // Button height
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(5), // Rounded corners
-                  ),
-                ),
-                child: Text('Login'),
-              ),
-            ),
-            SizedBox(height: 60), // Space after login button
-
-            // Divider with "Or login with"
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Divider(
-                    color: Colors.grey, // Gray split line
-                    thickness: 1,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Text(
-                    'Or login with',
-                    style: TextStyle(color: Colors.grey), // Gray text
-                  ),
-                ),
-                Expanded(
-                  child: Divider(
-                    color: Colors.grey, // Gray split line
-                    thickness: 1,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 60), // Space after divider
-
-            // Google and Facebook Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                // Google Button
-                ElevatedButton(
-                  onPressed: () {
-                    _handleGoogleLogin(); // Handle Google login
-                  },
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    backgroundColor: Colors.white, // Text color set to black
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12), // Button padding
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4), // Rounded corners
-                      side: BorderSide(color: Colors.grey), // Gray border
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Image.asset(
-                        'assets/icons/google.png', // Google icon
-                        width: 24,
-                        height: 24,
+                padding: EdgeInsets.only(top: 50, left: 20),
+                color: Color(0xFF0A3875),
+                height: 180,
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 15),
+                    Text(
+                      "Sign in to your",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.normal,
                       ),
-                      SizedBox(width: 8), // Space between icon and text
-                      Text(
-                        'Google',
-                        style: TextStyle(
-                          fontSize: 14, // Smaller font size
-                          color: Colors.black, // Text color set to black
+                    ),
+                    Text(
+                      "Account",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                    Text(
+                      "Welcome back!",
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    SizedBox(height: 70),
+                    TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        labelStyle: TextStyle(color: Color(0xFF133E87)),
+                        border: OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF133E87)),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 16), // Space between Google and Facebook
-                // Facebook Button
-                ElevatedButton(
-                  onPressed: () {
-                    _handleFacebookLogin(); // Handle Facebook login
-                  },
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    backgroundColor: Colors.white, // Text color set to black
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12), // Button padding
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4), // Rounded corners
-                      side: BorderSide(color: Colors.grey), // Gray border
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Image.asset(
-                        'assets/icons/facebook.png', // Facebook icon
-                        width: 24,
-                        height: 24,
-                      ),
-                      SizedBox(width: 8), // Space between icon and text
-                      Text(
-                        'Facebook',
-                        style: TextStyle(
-                          fontSize: 14, // Smaller font size
-                          color: Colors.black, // Text color set to black
+                    SizedBox(height: 30),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: _obscureText,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        labelStyle: TextStyle(color: Color(0xFF133E87)),
+                        border: OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF133E87)),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Image.asset(
+                            _obscureText
+                                ? 'assets/icons/hidden.png'
+                                : 'assets/icons/visible.png',
+                            width: 24,
+                            height: 24,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscureText = !_obscureText;
+                            });
+                          },
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20), // Space after buttons
+                    ),
+                    SizedBox(height: 1),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/forgotpassword');
+                        },
+                        child: Text(
+                          'Forgot Password?',
+                          style: TextStyle(color: Color(0xFF133E87)),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final email = _emailController.text.trim();
+                          final password = _passwordController.text.trim();
 
-            // "Don't have an account? Register"
-            TextButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/register');
-              },
-              child: Text(
-                'Don\'t have an account? Register',
-                style: TextStyle(
-                  color: Color(0xFF133E87), // Text color set to #133E87
+                          try {
+                            final response = await Supabase.instance.client.auth
+                                .signInWithPassword(
+                              email: email,
+                              password: password,
+                            );
+
+                            if (response.user != null) {
+                              Navigator.pushNamed(context, '/dashboard');
+                            } else {
+                              _showErrorDialog("Email or password is incorrect.");
+                            }
+                          } catch (e) {
+                            _showErrorDialog("Email or password is incorrect.");
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Color(0xFF133E87),
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                        child: Text('Login'),
+                      ),
+                    ),
+                    SizedBox(height: 60),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Divider(
+                            color: Colors.grey,
+                            thickness: 1,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            'Or login with',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                        Expanded(
+                          child: Divider(
+                            color: Colors.grey,
+                            thickness: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 60),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        ElevatedButton(
+                          onPressed: () {
+                            _handleGoogleLogin();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            backgroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                              side: BorderSide(color: Colors.grey),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Image.asset(
+                                'assets/icons/google.png',
+                                width: 24,
+                                height: 24,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Google',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            _handleFacebookLogin();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            backgroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                              side: BorderSide(color: Colors.grey),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Image.asset(
+                                'assets/icons/facebook.png',
+                                width: 24,
+                                height: 24,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Facebook',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 20),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/register');
+                      },
+                      child: Text(
+                        'Don\'t have an account? Register',
+                        style: TextStyle(
+                          color: Color(0xFF133E87),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-                ],
-              ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 
-  // Function to handle Google login
-  void _handleGoogleLogin() {
-    print('Google login pressed');
-    // Add your Google login logic here
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text("Login Failed"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            child: Text("OK"),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
   }
 
-  // Function to handle Facebook login
+  void _handleGoogleLogin() {
+    print('Google login pressed');
+    // Add Google login logic
+  }
+
   void _handleFacebookLogin() {
     print('Facebook login pressed');
-    // Add your Facebook login logic here
+    // Add Facebook login logic
   }
 }
