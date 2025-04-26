@@ -1,66 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Email Confirmed</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding-top: 100px;
-      background-color: #f5f7fa;
-    }
-    h1 {
-      color: #2e7d32;
-    }
-    #status {
-      margin-top: 20px;
-      font-size: 1.1rem;
-    }
-    a {
-      display: inline-block;
-      margin-top: 20px;
-      font-weight: bold;
-      color: #1976d2;
-      text-decoration: none;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Email Confirmation</title>
 </head>
 <body>
-  <h1>Email Confirmation</h1>
-  <p id="status">Processing your confirmation...</p>
+  <div id="status">Processing email confirmation...</div>
+
+  <!-- Supabase JS client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
   <script>
-    const SUPABASE_URL = 'https://msfnqnwhkmejglouqhqp.supabase.co/';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zZm5xbndoa21lamdsb3VxaHFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNzYxODQsImV4cCI6MjA2MDc1MjE4NH0.QnJ63Z37LOpaIU9e3mP49nr1zxOsJVbu8u6_mSRX_c8';
+    const SUPABASE_URL = 'https://msfnqnwhkmejglouqhqp.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zZm5xbndoa21lamdsb3VxaHFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNzYxODQsImV4cCI6MjA2MDc1MjE4NH0.QnJ63Z37LOpaIU9e3mP49nr1zxOsJVbu8u6_mSRX_c8'; // keep safe
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { createClient } = supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    async function confirmEmail() {
-      const urlParams = new URLSearchParams(window.location.hash.substring(1));
-      const access_token = urlParams.get('access_token');
-      const refresh_token = urlParams.get('refresh_token');
-      const type = urlParams.get('type');
+    async function confirmAndInsert() {
       const statusText = document.getElementById('status');
+      const queryParams = new URLSearchParams(window.location.search);
+      const code = queryParams.get('code');
+      const name = queryParams.get('name');
+      const email = queryParams.get('email');
+      const password = queryParams.get('password');
 
-      if (type === 'signup' && access_token && refresh_token) {
-        const { error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token
-        });
+      if (!code) {
+        statusText.textContent = '❌ Invalid or expired confirmation link.';
+        return;
+      }
 
+      try {
+        // Try to exchange the code for a session
+        const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code);
+
+        // If failed, continue anyway
         if (error) {
-          statusText.textContent = '❌ Error confirming email: ${error.message}';
-        } else {
-          statusText.textContent = '✅ Your email has been confirmed! You can now return to the app.';
+          console.warn("Session exchange failed, but continuing:", error.message);
         }
-      } else {
-        statusText.textContent = '⚠️ Invalid or missing confirmation parameters.';
+
+        // Get the user ID from the current session (if available)
+        const session = await supabaseClient.auth.getSession();
+        const user = session?.data?.session?.user;
+
+        if (!user) {
+          statusText.textContent = '✅ Email confirmed! (Could not get user ID)';
+          return;
+        }
+
+        const user_id = user.id;
+
+        // Insert into profile table
+        const { error: insertError } = await supabaseClient
+          .from('profile')
+          .insert([{ user_id, name, email, password }]);
+
+        if (insertError) {
+          console.error('Insert error:', insertError.message);
+          statusText.textContent = `✅ Email confirmed, but error saving profile: ${insertError.message}`;
+        } else {
+          statusText.textContent = '✅ Email confirmed and profile saved!';
+        }
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        statusText.textContent = '✅ Email confirmed, but an unexpected error occurred.';
       }
     }
 
-    confirmEmail();
+    document.addEventListener('DOMContentLoaded', confirmAndInsert);
   </script>
 </body>
 </html>
