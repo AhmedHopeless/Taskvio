@@ -1,4 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.project">
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR"/>
+    <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN" tools:ignore="ProtectedPermissions"/>
+
     <application
         android:label="project"
         android:name="${applicationName}"
@@ -30,6 +41,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+                <receiver
+                    android:name=".DeviceAdminReceiverClass"
+                    android:permission="android.permission.BIND_DEVICE_ADMIN"
+                    android:exported="true"> <!-- Set to true if other apps should access it, false otherwise -->
+                    <meta-data
+                        android:name="android.app.device_admin"
+                        android:resource="@xml/device_admin_receiver" />
+                    <intent-filter>
+                        <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                    </intent-filter>
+                </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

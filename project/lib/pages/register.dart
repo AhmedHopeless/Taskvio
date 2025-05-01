@@ -22,8 +22,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   double _passwordStrength = 0;
 
   Future<void> _signUp() async {
-  final name = _nameController.text;
-  final email = _emailController.text;
+  final name = _nameController.text.trim();
+  final email = _emailController.text.trim();
   final password = _passwordController.text;
   final repeatPassword = _repeatPasswordController.text;
 
@@ -34,49 +34,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return;
   }
 
+  if (password != repeatPassword) {
+    setState(() => _errorText = "Passwords do not match");
+    return;
+  }
+
   setState(() {
     _isLoading = true;
   });
 
-  
-
   try {
-    // Send magic link (sign up or sign in)
+    // Create the user in Supabase auth
     final response = await Supabase.instance.client.auth.signUp(
-  email: email,
-  password: password,
-  emailRedirectTo: '', // placeholder, we’ll set it below
-);
-  final userId = response.user?.id;
+      email: email,
+      password: password,
+    );
 
-  if (userId != null) {
-  final redirectUri = Uri(
-    scheme: 'http',
-    host: 'taskvio.ct.ws',
-    path: 'Email_confirm.html',
-    queryParameters: {
-      'user_id': userId,
-      'name': name,
-      'email': email,
-      'password': password,
-    },
-  );
+    if (response.user == null) {
+      throw Exception("Registration failed. Please try again.");
+    }
 
-  await Supabase.instance.client.auth.signUp(
-    email: email,
-    password: password,
-    emailRedirectTo: redirectUri.toString(),
-  );
-}
+    final user = response.user;
+    if (user != null) {
+      // Insert additional profile data into your table "profiles"
+      final insertResponse = await Supabase.instance.client
+          .from('profiles')
+          .insert({
+            'user_id': user.id,
+            'name': name, // full name
+            'email': email,
+            'password': password, // caution: storing raw passwords is not secure
+            'created_at': DateTime.now().toIso8601String(),
+          });
 
-    _showSnackBar("Check your email for the confirmation link.");
+      // // Check for null or error in the response.
+      // if (insertResponse == null || insertResponse.error != null) {
+      //   throw insertResponse?.error ?? Exception("Insert failed");
+      // }
+    }
 
-    // Show dialog after success
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Magic Link Sent"),
-        content: Text("Please check your email to confirm and log in."),
+        title: Text("Registration Successful"),
+        content: Text("Your account has been created. You can now log in."),
         actions: [
           TextButton(
             onPressed: () {
@@ -84,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Navigator.of(context).pop(); // Go back to login
             },
             child: Text("OK"),
-          ),
+          )
         ],
       ),
     );

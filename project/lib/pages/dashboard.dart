@@ -1,8 +1,13 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:project/pages/events.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:project/pages/teams.dart';
+import 'package:project/pages/tasks.dart';
 
 class DashboardScreen extends StatefulWidget {
+  static var primaryColor;
+
   const DashboardScreen({Key? key}) : super(key: key);
 
   @override
@@ -10,509 +15,1264 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  TextEditingController _titleController = TextEditingController();
-  TextEditingController _notesController = TextEditingController();
+  // Add this state variable to track the current nav index.
+  int _currentIndex = 0;
+
+  // Brand Colors and Typography (matching new_dashboard.dart look)
+  static const Color primaryColor = Color(0xFF4F5DD3);
+  static const Color lightGreen = Color(0xFFDFF3E3);
+
+  void _editTask(int index) {
+    // Preload the inline form with the task's existing data.
+    final task = tasks[index];
+    _titleController.text = task['title'] ?? '';
+    _notesController.text = task['description'] ?? '';
+    _selectedStartDate = task['taskDate'];
+    _selectedEndDate = task['dueDate'];
+    setState(() {
+      _editingTaskIndex = index;
+      _showTaskForm = true;
+    });
+  }
+
+  void _toggleTaskFinished(int index) {
+    setState(() {
+      tasks[index]['completed'] = !(tasks[index]['completed'] ?? false);
+    });
+  }
+
+  void _deleteTask(int index) {
+    setState(() {
+      tasks.removeAt(index);
+    });
+  }
+
+  void _editEvent(int index) {
+    final event = events[index];
+    _titleController.text = event['title'] ?? '';
+    _notesController.text = event['description'] ?? '';
+    _selectedStartDate = event['taskDate'];
+    _selectedEndDate = event['dueDate'];
+    setState(() {
+      _editingEventIndex = index;
+      _showEventForm = true;
+    });
+  }
+
+  void _toggleEventFinished(int index) {
+    setState(() {
+      events[index]['completed'] = !(events[index]['completed'] ?? false);
+    });
+  }
+
+  void _deleteEvent(int index) {
+    setState(() {
+      events.removeAt(index);
+    });
+  }
+  static const double borderRadius = 16.0;
+
+  // Controllers and state variables (for dialogs, etc.)
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
   DateTime? _selectedStartDate;
   DateTime? _selectedEndDate;
   String _selectedType = 'Task';
-
   List<Map<String, dynamic>> tasks = [];
   List<Map<String, dynamic>> events = [];
+  bool _showTaskForm = false;
+  bool _showEventForm = false;
+  int? _editingTaskIndex;
+  int? _editingEventIndex; // <-- Added this for editing events
 
-  double get _taskProgress {
-    if (tasks.isEmpty) return 0;
-    int completed = tasks.where((task) => task['completed'] == true).length;
-    return completed / tasks.length;
+  // Supabase: Fetch first name for greeting.
+  Future<String> _fetchFirstName() async {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (currentUser == null) return "User";
+    try {
+      final response = await Supabase.instance.client
+          .from('profiles')
+          .select('name')
+          .eq('user_id', currentUser.id)
+          .single();
+      if (response == null) return "User";
+      return response['name'] ?? "User";
+    } catch (e) {
+      print('Error fetching first name: $e');
+      return "User";
+    }
   }
 
-  double get _eventProgress {
-    if (events.isEmpty) return 0;
-    int completed = events.where((event) => event['completed'] == true).length;
-    return completed / events.length;
-  }
+  
 
-  double _overallProgress() {
-    int total = tasks.length + events.length;
-    if (total == 0) return 0;
-    int completed = tasks.where((t) => t['completed'] == true).length +
-        events.where((e) => e['completed'] == true).length;
-    return completed / total;
-  }
-
-  String _completedGoals() {
-    int completed = tasks.where((t) => t['completed'] == true).length +
-        events.where((e) => e['completed'] == true).length;
-    int total = tasks.length + events.length;
-    return "$completed/$total";
-  }
-
-  void _showAddNewDialog() {
-    showGeneralDialog(
-      context: context,
-      
-      barrierDismissible: true,
-      barrierLabel: 'Add New',
-      transitionDuration: Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return Center(child: _buildAddNewDialogContent());
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curvedValue = Curves.easeInOut.transform(animation.value) - 1.0;
-        return Transform(
-          transform: Matrix4.translationValues(0.0, curvedValue * -200, 0.0),
-          child: Opacity(opacity: animation.value, child: child),
+  // Greeting widget at top.
+  Widget _buildGreeting() {
+    return FutureBuilder<String>(
+      future: _fetchFirstName(),
+      builder: (context, snapshot) {
+        List<String> nameParts = (snapshot.data ?? 'User').split(" ");
+        String firstName = nameParts.first;
+        String greeting = "Hello, $firstName";
+        return Text(
+          greeting,
+          style: GoogleFonts.poppins(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
         );
       },
     );
   }
 
-  Widget _buildAddNewDialogContent() {
-    return Dialog(
-      backgroundColor: Colors.white,
-      shadowColor: Colors.indigo,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 16,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Add New', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigo)),
-              SizedBox(height: 20),
-              DropdownButtonFormField<String>(
-                value: _selectedType,
-                decoration: InputDecoration(
-                  labelText: 'Type',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  // "Today's Goals" card.
+  Widget _buildTodaysGoalsCard() {
+    if (tasks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: primaryColor,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.adjust, color: Colors.white, size: 32),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "No goals for today",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16),
                 ),
-                items: ['Task', 'Event'].map((type) {
-                  return DropdownMenuItem(value: type, child: Text(type));
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedType = value;
-                    });
-                  }
-                },
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  labelText: 'Title',
-                  
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                SizedBox(height: 4),
+                Text(
+                  "Add your first task",
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
                 ),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: _notesController,
-                decoration: InputDecoration(
-                  labelText: 'Notes',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                maxLines: 3,
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _pickStartDate,
-                child: Text(_selectedStartDate == null
-                    ? 'Pick Start Date'
-                    : 'Start: ${_selectedStartDate!.toLocal()}'.split(' ')[0]),
-                style: ElevatedButton.styleFrom(minimumSize: Size(double.infinity, 50), backgroundColor: const Color.fromARGB(255, 221, 226, 255), foregroundColor: Colors.indigo), 
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _pickEndDate,
-                child: Text(_selectedEndDate == null
-                    ? 'Pick End Date (Optional)'
-                    : 'End: ${_selectedEndDate!.toLocal()}'.split(' ')[0]),
-                style: ElevatedButton.styleFrom(minimumSize: Size(double.infinity, 50), backgroundColor: const Color.fromARGB(255, 221, 226, 255), foregroundColor: Colors.indigo),
-              ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: Text('Cancel' 
-                    ,style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.normal, color: Colors.indigo)),
+              ],
+            )
+          ],
+        ),
+      );
+    } else {
+      int totalTasks = tasks.length;
+      int completedTasks =
+          tasks.where((task) => task['completed'] == true).length;
+      int percent = totalTasks > 0 ? ((completedTasks / totalTasks) * 100).round() : 0;
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: primaryColor.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.star, color: Colors.white, size: 32),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Today's Progress",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
-                  ElevatedButton(
-                    onPressed: _addNewItem,
-                    child: Text('Add'
-                    ,style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.normal, color: Colors.indigo)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "$completedTasks of $totalTasks tasks completed ($percent%)",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white70,
+                    fontSize: 14,
                   ),
-                ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Add this method to combine tasks and events goals:
+  Widget _buildCombinedGoalsCard() {
+    int total = tasks.length + events.length;
+    int completedTasks = tasks.where((t) => t['completed'] == true).length;
+    int completedEvents = events.where((e) => e['completed'] == true).length;
+    int completed = completedTasks + completedEvents;
+    if (total == 0) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: primaryColor,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Row(
+          children: const [
+            Icon(Icons.adjust, color: Colors.white, size: 32),
+            SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "No goals for today",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Add your first task or event",
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ],
+            )
+          ],
+        ),
+      );
+    } else {
+      int percent = ((completed / total) * 100).round();
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: primaryColor.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.star, color: Colors.white, size: 32),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Today's Progress",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "$completed of $total goals completed ($percent%)",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Updated Action card used for Tasks and Events.
+  Widget _actionCard({
+    required IconData icon,
+    required String title,
+    required String percent,
+    required String subtitle,
+    required String buttonText,
+    required VoidCallback onPressed,
+  }) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: lightGreen,
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
+              child: Icon(icon, color: primaryColor),
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text("$percent $subtitle",
+                style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(buttonText, textAlign: TextAlign.center),
+            )
+          ],
         ),
       ),
     );
   }
 
-  void _pickStartDate() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedStartDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedStartDate = picked;
-      });
-    }
-  }
-
-  void _pickEndDate() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedEndDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedEndDate = picked;
-      });
-    }
-  }
-
-  void _addNewItem() {
-    if (_titleController.text.isNotEmpty && _selectedStartDate != null) {
-      final newItem = {
-        'title': _titleController.text,
-        'notes': _notesController.text,
-        'startDate': _selectedStartDate!.toLocal().toString().split(' ')[0],
-        'endDate': _selectedEndDate != null ? _selectedEndDate!.toLocal().toString().split(' ')[0] : null,
-        'completed': false,
-      };
-      setState(() {
-        if (_selectedType == 'Task') {
-          tasks.add(newItem);
-        } else {
-          events.add(newItem);
-        }
-      });
-      Navigator.pop(context);
-      _titleController.clear();
-      _notesController.clear();
-      _selectedStartDate = null;
-      _selectedEndDate = null;
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a Title and Start Date')),
-      );
-    }
-  }
-
-  Widget _buildProgressCircle({
-    required String title,
-    required double progress,
-    required Color baseColor,
-  }) {
-    Color dynamicColor = progress == 1.0 ? Colors.green : baseColor;
-
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 8),
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 4,
-              blurRadius: 8,
-              offset: Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: progress),
-            duration: Duration(milliseconds: 600),
-            curve: Curves.easeOutBack,
-            builder: (context, value, child) {
-              return SizedBox(
-                width: 90,
-                height: 90,
-                child: CircularProgressIndicator(
-                  strokeWidth: 8,
-                  value: value,
-                  backgroundColor: Colors.grey.shade300,
-                  color: dynamicColor,
-                ),
-              );
-            },
-          ),
-          SizedBox(height: 12),
-          Text(title, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-          SizedBox(height: 4),
-          Text("${(progress * 100).toInt()}%", style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600])),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDismissibleTile(Map<String, dynamic> item, bool isTask, int index) {
-    return Dismissible(
-      key: UniqueKey(),
-      background: Container(
-        alignment: Alignment.centerLeft,
-        color: Colors.green,
-        padding: EdgeInsets.only(left: 20),
-        child: Icon(Icons.check, color: Colors.white),
-      ),
-      secondaryBackground: Container(
-        alignment: Alignment.centerRight,
-        color: Colors.red,
-        padding: EdgeInsets.only(right: 20),
-        child: Icon(Icons.delete, color: Colors.white),
-      ),
-      confirmDismiss: (direction) async {
-        if (direction == DismissDirection.startToEnd) {
-          if (!item['completed']) {
-            setState(() {
-              if (isTask) tasks[index]['completed'] = true;
-              else events[index]['completed'] = true;
-            });
-          }
-          return false;
-        } else if (direction == DismissDirection.endToStart) {
-          return true;
-        }
-        return false;
-      },
-      onDismissed: (direction) {
-        setState(() {
-          if (isTask) tasks.removeAt(index);
-          else events.removeAt(index);
-        });
-      },
+  // Status card for Tasks section.
+  Widget _statusCard(String title, String subtitle, {IconData? icon}) {
+    return Expanded(
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isTask ? Colors.white : Colors.blue.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: Offset(0, 4),
+              blurRadius: 8,
             ),
           ],
         ),
         child: Row(
           children: [
-            Expanded(
+            Icon(
+              icon ?? Icons.task_alt,
+              color: Colors.blueAccent,
+              size: 32,
+            ),
+            const SizedBox(width: 12),
+            Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item['title'],
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      decoration: item['completed'] ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                  if (item['notes'] != null && item['notes'].isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6.0),
-                      child: Text(
-                        item['notes'],
-                        style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
-                      ),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6.0),
-                    child: Text(
-                      item['startDate'] != null
-                          ? 'Start: ${item['startDate']}${item['endDate'] != null ? ' - End: ${item['endDate']}' : ''}'
-                          : '',
-                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ),
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14)),
+                  if (subtitle.isNotEmpty)
+                    Text(subtitle,
+                        style: TextStyle(
+                            color: Colors.grey[600], fontSize: 13)),
                 ],
               ),
-            ),
+            )
           ],
         ),
       ),
     );
   }
 
-  Widget _buildList(bool isTask) {
-    final list = isTask ? tasks : events;
-    return list.isEmpty
-        ? Center(
-            child: Column(
-              children: [
-                SizedBox(height: 20),
-                Icon(isTask ? Icons.check_circle_outline : Icons.event_available_outlined,
-                    color: isTask ? Colors.indigo : Colors.indigo, size: 60),
-                SizedBox(height: 10),
-                Text(
-                  isTask ? "You're all set for tasks! 🎉" : "No upcoming events! 🗓️",
-                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-                ),
-                SizedBox(height: 20),
-              ],
-            ),
-          )
-        : ListView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            itemCount: list.length,
-            itemBuilder: (context, index) {
-              return _buildDismissibleTile(list[index], isTask, index);
-            },
-          );
+  // Inline task form that appears when _showTaskForm is true.
+  Widget _buildInlineTaskForm() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: _showTaskForm
+          ? Container(
+              key: const ValueKey('taskForm'),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(borderRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add Task',
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _titleController,
+                    decoration: InputDecoration(
+                      labelText: 'Task Name',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _notesController,
+                    decoration: InputDecoration(
+                      labelText: 'Task Description',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  // Task Date Field
+                  TextField(
+                    controller: TextEditingController(
+                      text: _selectedStartDate == null
+                          ? ''
+                          : _selectedStartDate!.toLocal().toString().split(' ')[0],
+                    ),
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Start Date',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                    onTap: () async {
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          _selectedStartDate = picked;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Due Date Field
+                  TextField(
+                    controller: TextEditingController(
+                      text: _selectedEndDate == null
+                          ? ''
+                          : _selectedEndDate!.toLocal().toString().split(' ')[0],
+                    ),
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Due Date',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                    onTap: () async {
+                      DateTime? pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        setState(() {
+                          _selectedEndDate = pickedDate;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _showTaskForm = false;
+                          });
+                        },
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(color: primaryColor),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          // Only process if a task name is provided.
+                          if (_titleController.text.isNotEmpty) {
+                            Map<String, dynamic> newTask = {
+                              'title': _titleController.text,
+                              'description': _notesController.text,
+                              'taskDate': _selectedStartDate,
+                              'dueDate': _selectedEndDate,
+                              'completed': false,
+                            };
+                            setState(() {
+                              if (_editingTaskIndex == null) {
+                                tasks.add(newTask);
+                              } else {
+                                tasks[_editingTaskIndex!] = newTask;
+                                _editingTaskIndex = null;
+                              }
+                              _showTaskForm = false;
+                              // Clear fields and date selections.
+                              _titleController.clear();
+                              _notesController.clear();
+                              _selectedStartDate = null;
+                              _selectedEndDate = null;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Task added', style: GoogleFonts.poppins()),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content:
+                                    Text('Please enter a task name', style: GoogleFonts.poppins()),
+                              ),
+                            );
+                          }
+                        },
+                        child: Text(
+                          _editingTaskIndex == null ? 'Add Task' : 'Save Task',
+                          style: GoogleFonts.poppins(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(key: ValueKey('emptyForm')),
+    );
   }
+
+  // Inline event form that appears when _showEventForm is true.
+  Widget _buildInlineEventForm() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: _showEventForm
+          ? Container(
+              key: const ValueKey('eventForm'),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(borderRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add Event',
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _titleController,
+                    decoration: InputDecoration(
+                      labelText: 'Event Name',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _notesController,
+                    decoration: InputDecoration(
+                      labelText: 'Event Description',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  // Event Date Field
+                  TextField(
+                    controller: TextEditingController(
+                      text: _selectedStartDate == null
+                          ? ''
+                          : _selectedStartDate!.toLocal().toString().split(' ')[0],
+                    ),
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Event Date',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                    onTap: () async {
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          _selectedStartDate = picked;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Event Time Field
+                  TextField(
+                    controller: TextEditingController(
+                      text: _selectedEndDate == null
+                          ? ''
+                          : _selectedEndDate!.toLocal().toString(),
+                    ),
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Event Time',
+                      labelStyle: GoogleFonts.poppins(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
+                    ),
+                    onTap: () async {
+                      TimeOfDay? pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (pickedTime != null) {
+                        setState(() {
+                          _selectedEndDate = DateTime(
+                            DateTime.now().year,
+                            DateTime.now().month,
+                            DateTime.now().day,
+                            pickedTime.hour,
+                            pickedTime.minute,
+                          );
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _showEventForm = false;
+                          });
+                        },
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(color: primaryColor),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          // Only process if an event name is provided.
+                          if (_titleController.text.isNotEmpty) {
+                            Map<String, dynamic> newEvent = {
+                              'title': _titleController.text,
+                              'description': _notesController.text,
+                              'taskDate': _selectedStartDate,
+                              'dueDate': _selectedEndDate,
+                              'completed': false,
+                            };
+                            setState(() {
+                              if (_editingEventIndex == null) {
+                                events.add(newEvent);
+                              } else {
+                                events[_editingEventIndex!] = newEvent;
+                                _editingEventIndex = null;
+                              }
+                              _showEventForm = false;
+                              // Clear fields and date selections.
+                              _titleController.clear();
+                              _notesController.clear();
+                              _selectedStartDate = null;
+                              _selectedEndDate = null;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Event added', style: GoogleFonts.poppins()),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Please enter an event name', style: GoogleFonts.poppins()),
+                              ),
+                            );
+                          }
+                        },
+                        child: Text(
+                          _editingEventIndex == null ? 'Add Event' : 'Save Event',
+                          style: GoogleFonts.poppins(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(key: ValueKey('emptyForm')),
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+  // Basic formatting: you can adjust this format as needed.
+  return dateTime.toLocal().toString().substring(0, 16);
+}
+
+  Widget _buildTasksList() {
+    if (tasks.isEmpty) {
+      return Row(
+        children: [
+          _statusCard("No tasks for today", "Enjoy your day!"),
+          const SizedBox(width: 12),
+        ],
+      );
+    } else {
+      int previewCount = tasks.length > 3 ? 3 : tasks.length;
+      return Column(
+        children: [
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: previewCount,
+            itemBuilder: (context, index) {
+              final task = tasks[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(borderRadius),
+                ),
+                child: ListTile(
+                  title: Text(task['title'], style: GoogleFonts.poppins()),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task['description'] ?? '',
+                        style: GoogleFonts.poppins(fontSize: 12),
+                      ),
+                      if (task['dueDate'] != null)
+                        Text(
+                          "Time: ${_formatDateTime(task['dueDate'])}",
+                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _editTask(index);
+                      } else if (value == 'finish') {
+                        _toggleTaskFinished(index);
+                      } else if (value == 'delete') {
+                        _deleteTask(index);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit', style: GoogleFonts.poppins()),
+                      ),
+                      PopupMenuItem(
+                        value: 'finish',
+                        child: Text(
+                          task['completed'] == true
+                              ? 'Mark as Unfinished'
+                              : 'Mark as Finished',
+                          style: GoogleFonts.poppins(),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete', style: GoogleFonts.poppins()),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          if (tasks.length > 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          TasksScreen(tasks: tasks),
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                        const begin = Offset(1.0, 0.0);
+                        const end = Offset.zero;
+                        final tween = Tween(begin: begin, end: end).chain(
+                          CurveTween(curve: Curves.ease),
+                        );
+                        return SlideTransition(
+                          position: animation.drive(tween),
+                          child: child,
+                        );
+                      },
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text("Go to Tasks Page", style: GoogleFonts.poppins()),
+              ),
+            ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildEventsList() {
+  if (events.isEmpty) {
+    return Row(
+      children: [
+        _statusCard("No events for today", "Enjoy your day!"),
+        const SizedBox(width: 12),
+      ],
+    );
+  } else {
+    int previewCount = events.length > 3 ? 3 : events.length;
+    return Column(
+      children: [
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: previewCount,
+          itemBuilder: (context, index) {
+            final event = events[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              child: ListTile(
+                title: Text(event['title'], style: GoogleFonts.poppins()),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event['description'] ?? '',
+                      style: GoogleFonts.poppins(fontSize: 12),
+                    ),
+                    if (event['dueDate'] != null)
+                      Text(
+                        "Time: ${_formatDateTime(event['dueDate'])}",
+                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                      ),
+                  ],
+                ),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _editEvent(index);
+                    } else if (value == 'finish') {
+                      _toggleEventFinished(index);
+                    } else if (value == 'delete') {
+                      _deleteEvent(index);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit', style: GoogleFonts.poppins()),
+                    ),
+                    PopupMenuItem(
+                      value: 'finish',
+                      child: Text(
+                        event['completed'] == true
+                            ? 'Mark as Unfinished'
+                            : 'Mark as Finished',
+                        style: GoogleFonts.poppins(),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete', style: GoogleFonts.poppins()),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        if (events.length > 3)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        EventsScreen(events: events),
+                    transitionsBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                      const begin = Offset(1.0, 0.0);
+                      const end = Offset.zero;
+                      final tween = Tween(begin: begin, end: end).chain(
+                        CurveTween(curve: Curves.ease),
+                      );
+                      return SlideTransition(
+                        position: animation.drive(tween),
+                        child: child,
+                      );
+                    },
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text("Go to Events Page", style: GoogleFonts.poppins()),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+  Widget _buildTasksSectionHeader() {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        "Tasks",
+        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+      // Show FAB only after at least one task is added.
+      if (tasks.isNotEmpty)
+        FloatingActionButton(
+          onPressed: () {
+            setState(() {
+              _showTaskForm = true;
+            });
+          },
+          mini: true,
+          elevation: 0,
+          backgroundColor: primaryColor,
+          shape: const CircleBorder(side: BorderSide.none),
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
+    ],
+  );
+}
+
+  // --- Add this new header for Events section ---
+Widget _buildEventsSectionHeader() {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        "Events",
+        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+      // Show FAB only after at least one event is added.
+      if (events.isNotEmpty)
+        FloatingActionButton(
+          onPressed: () {
+            setState(() {
+              _showEventForm = true;
+            });
+          },
+          mini: true,
+          elevation: 0,
+          backgroundColor: primaryColor,
+          shape: const CircleBorder(side: BorderSide.none),
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
+    ],
+  );
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Text("Dashboard", style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: SizedBox(
+          width: 200,
+          child: Text(
+            "Taskvio",
+            style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.indigo,
+            ),
+          ),
+        ), // or any title widget you use
         actions: [
-          IconButton(onPressed: () {}, icon: Icon(Icons.notifications_none, color: Colors.black)),
-          Theme(
-            data: Theme.of(context).copyWith(
-              cardColor: Colors.white,
-              shadowColor: Colors.black.withOpacity(0.1),
-              cardTheme: CardTheme(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
+          // Notification Bell Icon
+          IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.black),
+            onPressed: () {
+              // Implement notification functionality, e.g., show a snackbar or navigate
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Notifications pressed", style: GoogleFonts.poppins())),
+              );
+            },
+          ),
+          // Profile Icon with Dropdown Menu
+          PopupMenuButton<String>(
+            icon: CircleAvatar(
+              backgroundColor: DashboardScreen.primaryColor,
+              child: const Icon(Icons.person, color: Colors.white),
+            ),
+            onSelected: (value) {
+              if (value == 'Profile') {
+                // Navigate to Profile Screen
+              } else if (value == 'settings') {
+                Navigator.pushNamed(context, '/settings');
+              }else if (value == 'Logout') {
+                // Handle logout logic
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'Profile',
+                child: Text('Profile', style: GoogleFonts.poppins()),
+              ),PopupMenuItem<String>(
+                value: 'settings',
+                child: Text('settings', style: GoogleFonts.poppins()),
               ),
-            ),
-            child: PopupMenuButton<String>(
-              icon: Icon(Icons.person_outline, color: Colors.black),
-              offset: const Offset(0, 50),
-              onSelected: (String value) {
-                if (value == 'manageProfile') {
-                  print("Manage Profile clicked");
-                } else if (value == 'settings') {
-                  print("Settings clicked");
-                }
-              },
-              itemBuilder: (BuildContext context) => [
-                PopupMenuItem<String>(
-                  value: 'manageProfile',
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: Text('Manage Profile', style: TextStyle(color: Colors.black, fontSize: 16)),
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'settings',
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: Text('Settings', style: TextStyle(color: Colors.black, fontSize: 16)),
-                  ),
-                ),
-              ],
-            ),
+              PopupMenuItem<String>(
+                value: 'Logout',
+                child: Text('Logout', style: GoogleFonts.poppins()),
+              ),
+            ],
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Today's Goals", style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
-            SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.indigo, borderRadius: BorderRadius.circular(12)),
-              child: Row(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildGreeting(),
+              const SizedBox(height: 24),
+              Text("Today's Goals",
+                  style: GoogleFonts.poppins(
+                      fontSize: 18, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              _buildCombinedGoalsCard(),
+              const SizedBox(height: 16),
+              // Side-by-side Action Cards for Tasks & Events
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text("Today's Goal",
-                          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                      SizedBox(height: 8),
-                      Text("${_completedGoals()} Completed",
-                          style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70)),
-                    ]),
+                  _actionCard(
+                    icon: Icons.checklist_rounded,
+                    title: "Tasks",
+                    percent: tasks.isEmpty 
+                        ? "0%" 
+                        : "${((tasks.where((t) => t['completed'] == true).length / tasks.length) * 100).round()}%",
+                    subtitle: "Completed",
+                    buttonText: tasks.isEmpty ? "Add your first task" : "View Tasks",
+                    onPressed: () {
+                      if (tasks.isEmpty) {
+                        setState(() {
+                          _showTaskForm = !_showTaskForm;
+                        });
+                      } else {
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (context, animation, secondaryAnimation) =>
+                                TasksScreen(tasks: tasks),
+                            transitionsBuilder:
+                                (context, animation, secondaryAnimation, child) {
+                              const begin = Offset(1.0, 0.0);
+                              const end = Offset.zero;
+                              final tween = Tween(begin: begin, end: end).chain(
+                                CurveTween(curve: Curves.ease),
+                              );
+                              return SlideTransition(
+                                position: animation.drive(tween),
+                                child: child,
+                              );
+                            },
+                          ),
+                        );
+                      }
+                    },
                   ),
-                  Stack(alignment: Alignment.center, children: [
-                    SizedBox(
-                      width: 60,
-                      height: 60,
-                      child: CircularProgressIndicator(
-                        value: _overallProgress(),
-                        strokeWidth: 6,
-                        backgroundColor: Colors.white,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    ),
-                    Text("${(_overallProgress() * 100).toInt()}%",
-                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ]),
+                  _actionCard(
+                    icon: Icons.calendar_month_outlined,
+                    title: "Events",
+                    percent: events.isEmpty
+                        ? "0%"
+                        : "${((events.where((e) => e['completed'] == true).length / events.length) * 100).round()}%",
+                    subtitle: "Completed",
+                    buttonText: events.isEmpty ? "Add your first event" : "View events",
+                    onPressed: () {
+                      if (events.isEmpty) {
+                        setState(() {
+                          _showEventForm = !_showEventForm;
+                          _showTaskForm = false;
+                        });
+                      } else {
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (context, animation, secondaryAnimation) =>
+                                EventsScreen(events: events),
+                            transitionsBuilder:
+                                (context, animation, secondaryAnimation, child) {
+                              const begin = Offset(1.0, 0.0);
+                              const end = Offset.zero;
+                              final tween = Tween(begin: begin, end: end).chain(
+                                CurveTween(curve: Curves.ease),
+                              );
+                              return SlideTransition(
+                                position: animation.drive(tween),
+                                child: child,
+                              );
+                            },
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ],
               ),
-            ),
-            SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildProgressCircle(title: "Tasks", progress: _taskProgress, baseColor: Colors.red),
-                _buildProgressCircle(title: "Events", progress: _eventProgress, baseColor: Colors.lightBlue),
-              ],
-            ),
-            SizedBox(height: 40),
-            Text("Tasks", style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            _buildList(true),
-            SizedBox(height: 30),
-            Text("Events", style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            _buildList(false),
-          ],
+              const SizedBox(height: 16),
+              // Add both inline forms (they can be mutually exclusive if needed)
+              _buildInlineTaskForm(),
+              _buildInlineEventForm(), // <-- Add this so the event form appears when _showEventForm is true.
+              const SizedBox(height: 16),
+              // Tasks list (example placeholder)
+              _buildTasksSectionHeader(),
+              _buildTasksList(),
+              const SizedBox(height: 24),
+              _buildEventsSectionHeader(), // <-- Add this line to include the Events section header
+              _buildEventsList(),
+            ],
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.indigo,
-        onPressed: _showAddNewDialog,
-        child: Icon(Icons.add, color: Colors.white),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0, // Set the current index to Home
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.indigo,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        onTap: (index) {
-          if (index == 1) {
-            // Navigate to Teams page
-            Navigator.pushNamed(context, '/teams');
-          } else if (index == 2) {
-            // Navigate to Calendar page
-            Navigator.pushNamed(context, '/calendar');
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.group_outlined), label: 'Teams'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), label: 'Calendar'),
-          BottomNavigationBarItem(icon: Icon(Icons.bolt_outlined), label: 'Focus'),
-        ],
+      // Rounded bottom navigation bar with the new Settings item.
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8),
+          ],
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: primaryColor,
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          iconSize: 28,
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+            if (index == 0) {
+              // Already on Home (DashboardScreen).
+            } else if (index == 1) {
+              Navigator.pushNamed(context, '/teams');
+            } else if (index == 2) {
+              Navigator.pushNamed(context, '/calendar');
+            } else if (index == 3) {
+              // Navigate to Focus screen.
+              Navigator.pushNamed(context, '/focus');
+            }
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.group),
+              label: 'Teams',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today),
+              label: 'Calendar',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu_book_outlined),
+              label: 'Focus',
+            ),
+          ],
+        ),
       ),
     );
   }

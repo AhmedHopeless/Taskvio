@@ -15,7 +15,10 @@ dependencies:
   google_fonts: ^6.1.0
   table_calendar: ^3.0.8
   syncfusion_flutter_calendar: ^29.1.39
-  
+  file_picker: ^10.1.2
+  http: ^1.2.0
+  installed_apps: ^1.6.0
+  syncfusion_flutter_pdf: ^29.1.40
 
 dev_dependencies:
   flutter_test:
