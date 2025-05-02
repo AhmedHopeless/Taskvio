@@ -36,6 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _notesController.text = task['description'] ?? '';
     _selectedStartDate = task['taskDate'];
     _selectedEndDate = task['dueDate'];
+    
     setState(() {
       _editingTaskIndex = index;
       _showTaskForm = true;
@@ -211,6 +212,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .eq('UID', profileId)
         .eq('date', todayStr) as List<dynamic>?;
 
+    print('Fetched events: $data');
+
     setState(() {
       events = data
               ?.map((e) => {
@@ -218,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'title': e['title'],
                     'description': e['description'],
                     'taskDate': DateTime.parse(e['date']),
-                    'dueDate': DateTime.parse(e['time']),
+                    'dueDate': _combineDateAndTime(e['date'], e['time']),
                     'completed': e['complete'],
                   })
               .toList() ??
@@ -909,6 +912,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _formatDateTime(DateTime dateTime) {
   // Basic formatting: you can adjust this format as needed.
   return dateTime.toLocal().toString().substring(0, 16);
+}
+
+DateTime _combineDateAndTime(String date, String time) {
+  final datePart = DateTime.parse(date);
+  final timeParts = time.split(':');
+  return DateTime(
+    datePart.year,
+    datePart.month,
+    datePart.day,
+    int.parse(timeParts[0]),
+    int.parse(timeParts[1]),
+    int.parse(timeParts[2]),
+  );
 }
 
   Widget _buildTasksList() {
