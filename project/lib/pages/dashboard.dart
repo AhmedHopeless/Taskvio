@@ -22,6 +22,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const Color primaryColor = Color(0xFF4F5DD3);
   static const Color lightGreen = Color(0xFFDFF3E3);
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchTasksFromDb();
+    _fetchEventsFromDb();
+  }
+
   void _editTask(int index) {
     // Preload the inline form with the task's existing data.
     final task = tasks[index];
@@ -35,16 +42,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  void _toggleTaskFinished(int index) {
-    setState(() {
-      tasks[index]['completed'] = !(tasks[index]['completed'] ?? false);
-    });
+  Future<void> _toggleTaskFinished(int index) async {
+    final task = tasks[index];
+    try {
+      await Supabase.instance.client
+          .from('tasks')
+          .update({'complete': !(task['completed'] ?? false)})
+          .eq('id', task['id']);
+      await _fetchTasksFromDb();
+    } catch (e) {
+      _showSnackBar("Error updating task: $e");
+    }
   }
 
-  void _deleteTask(int index) {
-    setState(() {
-      tasks.removeAt(index);
-    });
+  Future<void> _deleteTask(int index) async {
+    final task = tasks[index];
+    try {
+      await Supabase.instance.client
+          .from('tasks')
+          .delete()
+          .eq('id', task['id']);
+      await _fetchTasksFromDb();
+    } catch (e) {
+      _showSnackBar("Error deleting task: $e");
+    }
   }
 
   void _editEvent(int index) {
@@ -59,17 +80,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  void _toggleEventFinished(int index) {
-    setState(() {
-      events[index]['completed'] = !(events[index]['completed'] ?? false);
-    });
+  Future<void> _toggleEventFinished(int index) async {
+    final event = events[index];
+    try {
+      await Supabase.instance.client
+          .from('events')
+          .update({'complete': !(event['completed'] ?? false)})
+          .eq('id', event['id']);
+      await _fetchEventsFromDb();
+    } catch (e) {
+      _showSnackBar("Error updating event: $e");
+    }
   }
 
-  void _deleteEvent(int index) {
-    setState(() {
-      events.removeAt(index);
-    });
+  Future<void> _deleteEvent(int index) async {
+    final event = events[index];
+    try {
+      await Supabase.instance.client
+          .from('events')
+          .delete()
+          .eq('id', event['id']);
+      await _fetchEventsFromDb();
+    } catch (e) {
+      _showSnackBar("Error deleting event: $e");
+    }
   }
+
+  void _viewAllTasks() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TasksScreen(tasks: tasks), // tasks already filtered for today
+      ),
+    );
+  }
+
+  void _viewAllEvents() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventsScreen(events: events), // events already filtered for today
+      ),
+    );
+  }
+
   static const double borderRadius = 16.0;
 
   // Controllers and state variables (for dialogs, etc.)
@@ -84,6 +138,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _showEventForm = false;
   int? _editingTaskIndex;
   int? _editingEventIndex; // <-- Added this for editing events
+
+  Future<int?> _getProfileId() async {
+  final user = Supabase.instance.client.auth.currentUser;
+  if (user == null) return null;
+
+  final data = await Supabase.instance.client
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1) as List<dynamic>?;
+
+  if (data != null && data.isNotEmpty) {
+    return data.first['id'] as int;
+  }
+  return null;
+}
 
   // Supabase: Fetch first name for greeting.
   Future<String> _fetchFirstName() async {
@@ -103,8 +173,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  
+  Future<void> _fetchTasksFromDb() async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+    final today = DateTime.now();
+    final todayStr = today.toIso8601String().split('T').first;
+    final data = await Supabase.instance.client
+        .from('tasks')
+        .select('id, title, description, start_date, due_date, complete')
+        .eq('UID', profileId)
+        .lte('start_date', todayStr)
+        .gte('due_date', todayStr) as List<dynamic>?;
 
+    setState(() {
+      tasks = data
+              ?.map((e) => {
+                    'id': e['id'],
+                    'title': e['title'],
+                    'description': e['description'],
+                    'taskDate': DateTime.parse(e['start_date']),
+                    'dueDate': DateTime.parse(e['due_date']),
+                    'completed': e['complete'],
+                  })
+              .toList() ??
+          [];
+    });
+  }
+
+  Future<void> _fetchEventsFromDb() async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+    final today = DateTime.now();
+    final todayStr = today.toIso8601String().split('T').first;
+    final data = await Supabase.instance.client
+        .from('events')
+        .select('id, title, description, date, time, complete')
+        .eq('UID', profileId)
+        .eq('date', todayStr) as List<dynamic>?;
+
+    setState(() {
+      events = data
+              ?.map((e) => {
+                    'id': e['id'],
+                    'title': e['title'],
+                    'description': e['description'],
+                    'taskDate': DateTime.parse(e['date']),
+                    'dueDate': DateTime.parse(e['time']),
+                    'completed': e['complete'],
+                  })
+              .toList() ??
+          [];
+    });
+  }
+  void _showSnackBar(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message)),
+  );
+}
+
+  Future<void> _createTask() async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+    try {
+      await Supabase.instance.client.from('tasks').insert({
+        'title': _titleController.text,
+        'description': _notesController.text,
+        'start_date': _selectedStartDate!.toIso8601String().split('T').first,
+        'due_date': _selectedEndDate!.toIso8601String().split('T').first,
+        'complete': false,
+        'UID': profileId,
+      });
+      await _fetchTasksFromDb();
+    } catch (e) {
+      _showSnackBar("Error creating task: $e");
+    }
+  }
+
+  Future<void> _createEvent() async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+    try {
+      final selectedTime = _selectedEndDate!; // This should be a DateTime
+
+      final formattedTime = "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}:00";
+      await Supabase.instance.client.from('events').insert({
+        'title': _titleController.text,
+        'description': _notesController.text,
+        'date': _selectedStartDate!.toIso8601String().split('T').first,
+        'time': formattedTime,
+        'complete': false,
+        'UID': profileId,
+      });
+      await _fetchEventsFromDb();
+    } catch (e) {
+      _showSnackBar("Error creating event: $e");
+    }
+  }
   // Greeting widget at top.
   Widget _buildGreeting() {
     return FutureBuilder<String>(
@@ -513,23 +677,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           // Only process if a task name is provided.
                           if (_titleController.text.isNotEmpty) {
-                            Map<String, dynamic> newTask = {
-                              'title': _titleController.text,
-                              'description': _notesController.text,
-                              'taskDate': _selectedStartDate,
-                              'dueDate': _selectedEndDate,
-                              'completed': false,
-                            };
+                            await _createTask();
                             setState(() {
-                              if (_editingTaskIndex == null) {
-                                tasks.add(newTask);
-                              } else {
-                                tasks[_editingTaskIndex!] = newTask;
-                                _editingTaskIndex = null;
-                              }
                               _showTaskForm = false;
                               // Clear fields and date selections.
                               _titleController.clear();
@@ -715,23 +867,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           // Only process if an event name is provided.
                           if (_titleController.text.isNotEmpty) {
-                            Map<String, dynamic> newEvent = {
-                              'title': _titleController.text,
-                              'description': _notesController.text,
-                              'taskDate': _selectedStartDate,
-                              'dueDate': _selectedEndDate,
-                              'completed': false,
-                            };
+                            await _createEvent();
                             setState(() {
-                              if (_editingEventIndex == null) {
-                                events.add(newEvent);
-                              } else {
-                                events[_editingEventIndex!] = newEvent;
-                                _editingEventIndex = null;
-                              }
                               _showEventForm = false;
                               // Clear fields and date selections.
                               _titleController.clear();
