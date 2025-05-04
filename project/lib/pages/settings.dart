@@ -31,65 +31,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // My Account Section
-          Text(
-            "My Account",
-            style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.only(bottom: 16),
-            elevation: 2,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text("Change Name", style: GoogleFonts.poppins(fontSize: 16)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    // Navigate to Change Name screen
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.email),
-                  title: Text("Change Email", style: GoogleFonts.poppins(fontSize: 16)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    // Navigate to Change Email screen
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.lock),
-                  title: Text("Change Password", style: GoogleFonts.poppins(fontSize: 16)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    // Navigate to Change Password screen
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: Text("Log Out", style: GoogleFonts.poppins(fontSize: 16)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    // Handle log out
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.delete_forever),
-                  title: Text("Delete Account", style: GoogleFonts.poppins(fontSize: 16)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    // Handle account deletion
-                  },
-                ),
-              ],
-            ),
-          ),
           // App Preferences Section
           Text(
             "App Preferences",

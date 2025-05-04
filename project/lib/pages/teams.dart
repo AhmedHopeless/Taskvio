@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TeamsScreen extends StatefulWidget {
   const TeamsScreen({Key? key}) : super(key: key);
@@ -8,45 +9,166 @@ class TeamsScreen extends StatefulWidget {
   State<TeamsScreen> createState() => _TeamsScreenState();
 }
 
-class _TeamsScreenState extends State<TeamsScreen> {
-  List<Map<String, String>> teams = [];
-  List<Map<String, String>> filteredTeams = [];
+class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStateMixin {
+  List<Map<String, dynamic>> teams = [];
+  List<Map<String, dynamic>> filteredTeams = [];
   bool isLoading = false;
+  bool _isFabExpanded = false;
+  late AnimationController _fabAnimationController;
+  late Animation<double> _fabAnimation;
 
   @override
   void initState() {
     super.initState();
-    _loadTeams();
+    _fetchUserTeams();
+    _fabAnimationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 250),
+    );
+    _fabAnimation = CurvedAnimation(
+      parent: _fabAnimationController,
+      curve: Curves.easeInOut,
+    );
   }
 
-  Future<void> _loadTeams() async {
+  @override
+  void dispose() {
+    _fabAnimationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchUserTeams() async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+    final data = await Supabase.instance.client
+        .from('team_user_rel')
+        .select('rel_ID, TID, team_leader, teams(id, code, name, description)')
+        .eq('UID', profileId) as List<dynamic>?;
     setState(() {
-      isLoading = true;
+      teams = data
+          ?.map((e) => {
+                'rel_ID': e['rel_ID'],
+                'TID': e['TID'],
+                'team_leader': e['team_leader'],
+                'team': e['teams'],
+              })
+          .toList() ??
+          [];
+      filteredTeams = teams;
+    });
+    print('Fetched teams: $teams');
+  }
+
+  Future<int?> _getProfileId() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return null;
+    final data = await Supabase.instance.client
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1) as List<dynamic>?;
+    if (data != null && data.isNotEmpty) {
+      return data.first['id'] as int;
+    }
+    return null;
+  }
+
+  Future<void> _joinTeam(String code) async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+    final teamData = await Supabase.instance.client
+        .from('teams')
+        .select('id')
+        .eq('code', code)
+        .maybeSingle();
+    if (teamData == null) {
+      _showSnackBar('Team not found');
+      return;
+    }
+    final teamId = teamData['id'];
+    // Check if already a member
+    final existing = await Supabase.instance.client
+        .from('team_user_rel')
+        .select()
+        .eq('UID', profileId)
+        .eq('TID', teamId) as List<dynamic>?;
+    if (existing != null && existing.isNotEmpty) {
+      _showSnackBar('Already a member');
+      return;
+    }
+    await Supabase.instance.client.from('team_user_rel').insert({
+      'UID': profileId,
+      'TID': teamId,
+      'team_leader': false,
+    });
+    _showSnackBar('Joined team!');
+    await _fetchUserTeams();
+  }
+
+  Future<void> _createTeam(String name, String description) async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+
+    final code = _generateTeamCode();
+
+    // Insert the team and get the inserted row (with id)
+    final teamInsert = await Supabase.instance.client
+        .from('teams')
+        .insert({
+          'code': code,
+          'name': name,
+          'description': description,
+        })
+        .select()
+        .single();
+
+    final teamId = teamInsert['id'];
+
+    // Now insert into team_user_rel
+    await Supabase.instance.client.from('team_user_rel').insert({
+      'UID': profileId,
+      'TID': teamId,
+      'team_leader': true,
     });
 
-    // Simulate a delay for loading teams
-    // await Future.delayed(const Duration(seconds: 2));
+    _showSnackBar('Team created!');
+    await _fetchUserTeams();
+  }
 
+  Future<void> _deleteTeam(int teamId) async {
+    final profileId = await _getProfileId();
+    if (profileId == null) return;
+    // Check if user is leader
+    final rel = await Supabase.instance.client
+        .from('team_user_rel')
+        .select('team_leader')
+        .eq('UID', profileId)
+        .eq('TID', teamId)
+        .maybeSingle();
+    if (rel == null || rel['team_leader'] != true) {
+      _showSnackBar('Only the team leader can delete the team.');
+      return;
+    }
+    await Supabase.instance.client.from('teams').delete().eq('id', teamId);
+    await Supabase.instance.client.from('team_user_rel').delete().eq('TID', teamId);
+    _showSnackBar('Team deleted!');
+    await _fetchUserTeams();
+  }
+
+  String _generateTeamCode() {
+    // Simple random code generator
+    final rand = DateTime.now().millisecondsSinceEpoch.remainder(1000000);
+    return 'T$rand';
+  }
+
+  void _toggleFab() {
     setState(() {
-      teams = [
-        {
-          'name': 'Design Team',
-          'description': 'Handles all UI/UX designs',
-          'members': '5'
-        },
-        {
-          'name': 'Development Team',
-          'description': 'Builds the product',
-          'members': '8'
-        },
-        {
-          'name': 'Marketing Team',
-          'description': 'Promotes the product',
-          'members': '4'
-        },
-      ];
-      filteredTeams = teams;
-      isLoading = false;
+      _isFabExpanded = !_isFabExpanded;
+      if (_isFabExpanded) {
+        _fabAnimationController.forward();
+      } else {
+        _fabAnimationController.reverse();
+      }
     });
   }
 
@@ -97,18 +219,64 @@ class _TeamsScreenState extends State<TeamsScreen> {
                     ElevatedButton(
                       onPressed: () {
                         if (_teamNameController.text.isNotEmpty) {
-                          setState(() {
-                            teams.add({
-                              'name': _teamNameController.text,
-                              'description': _teamDescController.text,
-                              'members': '0',
-                            });
-                            filteredTeams = teams;
-                          });
+                          _createTeam(
+                              _teamNameController.text, _teamDescController.text);
                           Navigator.pop(context);
                         }
                       },
                       child: Text('Create'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showJoinTeamDialog() {
+    TextEditingController _joinTeamCodeController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Join Team',
+                    style: GoogleFonts.poppins(
+                        fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _joinTeamCodeController,
+                  decoration: InputDecoration(
+                    labelText: 'Team Code',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_joinTeamCodeController.text.isNotEmpty) {
+                          _joinTeam(_joinTeamCodeController.text);
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Text('Join'),
                     ),
                   ],
                 ),
@@ -175,7 +343,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
                               'description': _teamDescController.text,
                               'members': teams[index]['members'] ?? '0',
                             };
-                            filteredTeams = teams;
+                            filteredTeams = teams.cast<Map<String, String>>();
                           });
                           Navigator.pop(context);
                         }
@@ -192,7 +360,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
     );
   }
 
-  void _deleteTeam(int index) {
+  void _deleteTeamDialog(int index) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -204,11 +372,11 @@ class _TeamsScreenState extends State<TeamsScreen> {
             child: Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                teams.removeAt(index);
-                filteredTeams = teams;
-              });
+            onPressed: () async {
+              final teamId = teams[index]['TID'];
+              if (teamId != null) {
+                await _deleteTeam(teamId);
+              }
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -219,93 +387,33 @@ class _TeamsScreenState extends State<TeamsScreen> {
     );
   }
 
- Widget _buildTeamCard(Map<String, String> team, int index) {
-  return GestureDetector(
-    onTap: () {
-      Navigator.pushNamed(context, '/team_dashboard');
-    },
-    child: Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.indigo.shade100,
-            child: Icon(Icons.group, color: Colors.indigo, size: 30),
-          ),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  team['name'] ?? '',
-                  style: GoogleFonts.poppins(
-                      fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  team['description'] ?? '',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: Colors.grey[700]),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Members: ${team['members'] ?? '0'}',
-                  style: GoogleFonts.poppins(
-                      fontSize: 12, color: Colors.grey[500]),
-                ),
-              ],
-            ),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'edit') {
-                _showEditTeamDialog(index);
-              } else if (value == 'delete') {
-                _deleteTeam(index);
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18, color: Colors.indigo),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Delete'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
+  void _filterTeams(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        filteredTeams = teams;
+      } else {
+        filteredTeams = teams.where((teamMap) {
+          final team = teamMap['team'];
+          final name = (team['name'] ?? '').toLowerCase();
+          final desc = (team['description'] ?? '').toLowerCase();
+          return name.contains(query.toLowerCase()) || desc.contains(query.toLowerCase());
+        }).toList();
+      }
+    });
+  }
+
+  Widget _buildTeamCard(Map<String, dynamic> teamMap, int index) {
+    final team = teamMap['team']; // This is the nested map with name, code, etc.
+
+    return ListTile(
+      title: Text(team['name'] ?? ''),
+      subtitle: Text(team['description'] ?? ''),
+      // ...other widgets
     );
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -316,7 +424,6 @@ class _TeamsScreenState extends State<TeamsScreen> {
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         automaticallyImplyLeading: false,
         title: Text("Teams (${filteredTeams.length})"),
-        
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())
@@ -326,13 +433,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
                   padding: const EdgeInsets.all(16.0),
                   child: TextField(
                     onChanged: (value) {
-                      setState(() {
-                        filteredTeams = teams
-                            .where((team) => team['name']!
-                                .toLowerCase()
-                                .contains(value.toLowerCase()))
-                            .toList();
-                      });
+                      _filterTeams(value);
                     },
                     decoration: InputDecoration(
                       hintText: 'Search teams...',
@@ -366,16 +467,87 @@ class _TeamsScreenState extends State<TeamsScreen> {
                       : ListView.builder(
                           itemCount: filteredTeams.length,
                           itemBuilder: (context, index) {
-                            return _buildTeamCard(filteredTeams[index], index);
+                            final teamMap = filteredTeams[index];
+                            final team = teamMap['team'];
+                            return Card(
+                              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 2,
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.indigo.shade100,
+                                  child: Icon(Icons.group, color: Colors.indigo),
+                                ),
+                                title: Text(
+                                  team['name'] ?? '',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  team['description'] ?? '',
+                                  style: GoogleFonts.poppins(),
+                                ),
+                                trailing: Icon(Icons.arrow_forward_ios, color: Colors.indigo),
+                                onTap: () {
+                                  // Navigate to team dashboard or details
+                                  // Navigator.push(...);
+                                },
+                              ),
+                            );
                           },
                         ),
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateTeamDialog,
-        backgroundColor: Colors.indigo,
-        child: Icon(Icons.add, color: Colors.white),
+      floatingActionButton: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          ScaleTransition(
+            scale: _fabAnimation,
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 140.0),
+              child: FloatingActionButton.extended(
+                heroTag: 'joinTeam',
+                onPressed: () {
+                  _toggleFab();
+                  _showJoinTeamDialog();
+                },
+                label: Text('Join Team'),
+                icon: Icon(Icons.group_add),
+              ),
+            ),
+          ),
+          ScaleTransition(
+            scale: _fabAnimation,
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 70.0),
+              child: FloatingActionButton.extended(
+                heroTag: 'createTeam',
+                onPressed: () {
+                  _toggleFab();
+                  _showCreateTeamDialog();
+                },
+                label: Text('Create Team'),
+                icon: Icon(Icons.add),
+              ),
+            ),
+          ),
+          FloatingActionButton(
+            heroTag: 'mainFab',
+            onPressed: _toggleFab,
+            backgroundColor: Colors.indigo,
+            child: AnimatedIcon(
+              icon: AnimatedIcons.menu_close,
+              progress: _fabAnimationController,
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,

@@ -30,13 +30,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _editTask(int index) {
-    // Preload the inline form with the task's existing data.
     final task = tasks[index];
     _titleController.text = task['title'] ?? '';
     _notesController.text = task['description'] ?? '';
     _selectedStartDate = task['taskDate'];
     _selectedEndDate = task['dueDate'];
-    
+    // Save the task's unique id.
+    _editingTaskId = task['id'];
     setState(() {
       _editingTaskIndex = index;
       _showTaskForm = true;
@@ -69,12 +69,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _updateTask() async {
+    try {
+      if (_editingTaskId != null) {
+        await Supabase.instance.client.from('tasks').update({
+          'title': _titleController.text,
+          'description': _notesController.text,
+          'start_date': _selectedStartDate!.toIso8601String().split('T').first,
+          'due_date': _selectedEndDate!.toIso8601String().split('T').first,
+        }).eq('id', _editingTaskId!);
+      }
+      await _fetchTasksFromDb();
+    } catch (e) {
+      _showSnackBar("Error updating task: $e");
+    }
+  }
+
   void _editEvent(int index) {
     final event = events[index];
     _titleController.text = event['title'] ?? '';
     _notesController.text = event['description'] ?? '';
     _selectedStartDate = event['taskDate'];
     _selectedEndDate = event['dueDate'];
+    _editingEventId = event['id']; // Save the event's unique id.
     setState(() {
       _editingEventIndex = index;
       _showEventForm = true;
@@ -104,6 +121,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       await _fetchEventsFromDb();
     } catch (e) {
       _showSnackBar("Error deleting event: $e");
+    }
+  }
+
+  Future<void> _updateEvent() async {
+    try {
+      if (_editingEventId != null) {
+        final selectedTime = _selectedEndDate!;
+        final formattedTime = "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}:00";
+        await Supabase.instance.client.from('events').update({
+          'title': _titleController.text,
+          'description': _notesController.text,
+          'date': _selectedStartDate!.toIso8601String().split('T').first,
+          'time': formattedTime,
+        }).eq('id', _editingEventId!);
+      }
+      await _fetchEventsFromDb();
+    } catch (e) {
+      _showSnackBar("Error updating event: $e");
     }
   }
 
@@ -139,6 +174,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _showEventForm = false;
   int? _editingTaskIndex;
   int? _editingEventIndex; // <-- Added this for editing events
+  int? _editingTaskId; // <-- Added this for saving task's unique id
+  int? _editingEventId; // <-- Add this for saving event's unique id
 
   Future<int?> _getProfileId() async {
   final user = Supabase.instance.client.auth.currentUser;
@@ -177,14 +214,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _fetchTasksFromDb() async {
     final profileId = await _getProfileId();
     if (profileId == null) return;
-    final today = DateTime.now();
-    final todayStr = today.toIso8601String().split('T').first;
+    // For testing: remove date filters so that all tasks are returned.
     final data = await Supabase.instance.client
         .from('tasks')
         .select('id, title, description, start_date, due_date, complete')
-        .eq('UID', profileId)
-        .lte('start_date', todayStr)
-        .gte('due_date', todayStr) as List<dynamic>?;
+        .eq('UID', profileId) as List<dynamic>?;
 
     setState(() {
       tasks = data
@@ -272,6 +306,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _showSnackBar("Error creating event: $e");
     }
   }
+
+  Future<void> _logout() async {
+    await Supabase.instance.client.auth.signOut();
+    Navigator.pushReplacementNamed(context, '/login'); // Adjust the route as needed.
+  }
+
   // Greeting widget at top.
   Widget _buildGreeting() {
     return FutureBuilder<String>(
@@ -681,27 +721,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: () async {
-                          // Only process if a task name is provided.
                           if (_titleController.text.isNotEmpty) {
-                            await _createTask();
+                            if (_editingTaskIndex == null) {
+                              await _createTask();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Task added', style: GoogleFonts.poppins())),
+                              );
+                            } else {
+                              await _updateTask();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Task updated', style: GoogleFonts.poppins())),
+                              );
+                            }
                             setState(() {
                               _showTaskForm = false;
+                              _editingTaskIndex = null;
                               // Clear fields and date selections.
                               _titleController.clear();
                               _notesController.clear();
                               _selectedStartDate = null;
                               _selectedEndDate = null;
                             });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Task added', style: GoogleFonts.poppins()),
-                              ),
-                            );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content:
-                                    Text('Please enter a task name', style: GoogleFonts.poppins()),
+                                content: Text('Please enter a task name', style: GoogleFonts.poppins()),
                               ),
                             );
                           }
@@ -871,22 +915,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(width: 8),
                       ElevatedButton(
                         onPressed: () async {
-                          // Only process if an event name is provided.
                           if (_titleController.text.isNotEmpty) {
-                            await _createEvent();
+                            if (_editingEventIndex == null) {
+                              await _createEvent();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Event added', style: GoogleFonts.poppins())),
+                              );
+                            } else {
+                              await _updateEvent();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Event updated', style: GoogleFonts.poppins())),
+                              );
+                            }
                             setState(() {
                               _showEventForm = false;
+                              _editingEventIndex = null;
+                              _editingEventId = null;
                               // Clear fields and date selections.
                               _titleController.clear();
                               _notesController.clear();
                               _selectedStartDate = null;
                               _selectedEndDate = null;
                             });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Event added', style: GoogleFonts.poppins()),
-                              ),
-                            );
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -1247,17 +1297,18 @@ Widget _buildEventsSectionHeader() {
                 // Navigate to Profile Screen
               } else if (value == 'settings') {
                 Navigator.pushNamed(context, '/settings');
-              }else if (value == 'Logout') {
-                // Handle logout logic
+              } else if (value == 'Logout') {
+                _logout();
               }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
               PopupMenuItem<String>(
                 value: 'Profile',
                 child: Text('Profile', style: GoogleFonts.poppins()),
-              ),PopupMenuItem<String>(
+              ),
+              PopupMenuItem<String>(
                 value: 'settings',
-                child: Text('settings', style: GoogleFonts.poppins()),
+                child: Text('Settings', style: GoogleFonts.poppins()),
               ),
               PopupMenuItem<String>(
                 value: 'Logout',
