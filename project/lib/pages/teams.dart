@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:project/pages/team_dashboard.dart';
 
 class TeamsScreen extends StatefulWidget {
   const TeamsScreen({Key? key}) : super(key: key);
@@ -492,9 +493,15 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                                   style: GoogleFonts.poppins(),
                                 ),
                                 trailing: Icon(Icons.arrow_forward_ios, color: Colors.indigo),
-                                onTap: () {
-                                  // Navigate to team dashboard or details
-                                  // Navigator.push(...);
+                                onTap: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => TeamDashboard(tid: team['id'])),
+                                  );
+                                  if (result == true) {
+                                    // Team was deleted or left, so refresh the list
+                                    _fetchUserTeams();
+                                  }
                                 },
                               ),
                             );

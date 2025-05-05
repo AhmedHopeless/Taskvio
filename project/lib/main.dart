@@ -39,15 +39,6 @@ class MyApp extends StatelessWidget {
         '/calendar': (context) => CalendarScreen(),
         '/focus': (context) => FocusModeScreen(),
         '/settings': (context) => SettingsScreen(),
-        '/team_dashboard': (context) => TeamDashboardScreen(
-          team: {
-            'name': 'Team A',
-            'description': 'This is Team A',
-            'createdBy': 'Admin',
-            'members': '5',
-            'profilePictureUrl': 'https://example.com/profile.jpg',
-          },
-        ),
       },
     );
   }
