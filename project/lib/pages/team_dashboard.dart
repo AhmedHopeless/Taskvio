@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:project/pages/filteredTasks.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum TaskStatus { pending, inProgress, completed, overdue }
@@ -151,10 +152,10 @@ class _TeamDashboardState extends State<TeamDashboard> {
 
   Future<void> _fetchAllTeamTasksEvents() async {
     final tasks = await Supabase.instance.client
-        .from('team_tasks')
-        .select()
-        .eq('TID', widget.tid) as List<dynamic>?;
-    final teamTasks = tasks?.cast<Map<String, dynamic>>() ?? [];
+      .from('team_tasks')
+      .select()
+      .eq('TID', widget.tid) as List<dynamic>?;
+    teamTasks = tasks?.cast<Map<String, dynamic>>() ?? [];
     final events = await Supabase.instance.client
         .from('team_events')
         .select()
@@ -277,6 +278,31 @@ class _TeamDashboardState extends State<TeamDashboard> {
               Navigator.pop(context);
             },
             child: Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> showTeamCodeDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Team Code',
+          style: TextStyle(fontSize: 24), // Bigger title text
+        ),
+        content: Text(
+          'Your team code is: ${teamInfo?['code'] ?? 'N/A'}',
+          style: TextStyle(fontSize: 20), // Bigger content text
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: TextStyle(fontSize: 18), // Bigger button text
+            ),
           ),
         ],
       ),
@@ -473,6 +499,23 @@ class _TeamDashboardState extends State<TeamDashboard> {
     return true;
   }
 
+void _navigateToTaskList(BuildContext context, {required String filter}) {
+  final tasks = isLeader ? teamTasks : myTasks;
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => FilteredTaskListPage(
+        tasks: tasks,
+        filter: filter,
+        isTeamLeader: isLeader,
+        onEdit: (task) => _editTask(task),
+        onDelete: (task) => _deleteTask(task),
+        onMarkDone: (task) => _markTaskDone(task),
+      ),
+    ),
+  );
+}
+
   Future<bool> showAddEventDialog() async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
@@ -620,6 +663,278 @@ class _TeamDashboardState extends State<TeamDashboard> {
     return true; // Ensure a boolean is always returned
   }
 
+  Future<void> showEditTaskDialog(Map<String, dynamic> task) async {
+  final titleController = TextEditingController(text: task['title'] ?? '');
+  final descController = TextEditingController(text: task['description'] ?? '');
+  DateTime? startDate = DateTime.tryParse(task['start_date'] ?? '');
+  DateTime? dueDate = DateTime.tryParse(task['due_date'] ?? '');
+
+  await showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text('Edit Task'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(labelText: 'Title'),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: descController,
+                decoration: InputDecoration(labelText: 'Description'),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: startDate == null ? '' : startDate?.toLocal().toString().split(' ')[0],
+                ),
+                decoration: InputDecoration(labelText: 'Start Date'),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: startDate ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      startDate = picked;
+                    });
+                  }
+                },
+              ),
+              SizedBox(height: 12),
+              TextField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: dueDate == null ? '' : dueDate?.toLocal().toString().split(' ')[0],
+                ),
+                decoration: InputDecoration(labelText: 'Due Date'),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: dueDate ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      dueDate = picked;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await Supabase.instance.client
+                  .from('team_tasks')
+                  .update({
+                    'title': titleController.text,
+                    'description': descController.text,
+                    'start_date': startDate?.toIso8601String().split('T').first,
+                    'due_date': dueDate?.toIso8601String().split('T').first,
+                  })
+                  .eq('id', task['id']);
+              Navigator.pop(context);
+            },
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> showEditEventDialog(Map<String, dynamic> event) async {
+  final titleController = TextEditingController(text: event['title'] ?? '');
+  final descController = TextEditingController(text: event['description'] ?? '');
+  DateTime? eventDate = DateTime.tryParse(event['date'] ?? '');
+  TimeOfDay? eventTime;
+  if (event['time'] != null && event['time'].toString().contains(':')) {
+    final parts = event['time'].split(':');
+    eventTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+
+  await showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text('Edit Event'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(labelText: 'Title'),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: descController,
+                decoration: InputDecoration(labelText: 'Description'),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: eventDate == null
+                      ? ''
+                      : eventDate?.toLocal().toString().split(' ')[0],
+                ),
+                decoration: InputDecoration(labelText: 'Event Date'),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: eventDate ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      eventDate = picked;
+                    });
+                  }
+                },
+              ),
+              SizedBox(height: 12),
+              TextField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: eventTime == null ? '' : eventTime?.format(context),
+                ),
+                decoration: InputDecoration(labelText: 'Event Time'),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: eventTime ?? TimeOfDay.now(),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      eventTime = picked;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final formattedTime = eventTime == null
+                  ? null
+                  : '${eventTime?.hour.toString().padLeft(2, '0')}:${eventTime?.minute.toString().padLeft(2, '0')}:00';
+              await Supabase.instance.client
+                  .from('team_events')
+                  .update({
+                    'title': titleController.text,
+                    'description': descController.text,
+                    'date': eventDate?.toIso8601String().split('T').first,
+                    'time': formattedTime,
+                  })
+                  .eq('id', event['id']);
+              Navigator.pop(context);
+            },
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Future<void> _editTask(Map<String, dynamic> task) async {
+  // Show your edit dialog, then refresh
+  await showEditTaskDialog(task);
+  await _fetchAllTeamTasksEvents();
+  _calculateTaskStats(teamTasks);
+  setState(() {});
+}
+
+Future<void> _deleteTask(Map<String, dynamic> task) async {
+  // First, delete all relations for this task
+  await Supabase.instance.client
+      .from('TeamTask_user_rel')
+      .delete()
+      .eq('TaskID', task['id']);
+  // Then, delete the task itself
+  await Supabase.instance.client
+      .from('team_tasks')
+      .delete()
+      .eq('id', task['id']);
+  await _fetchAllTeamTasksEvents();
+  _calculateTaskStats(teamTasks);
+  setState(() {});
+}
+
+Future<void> _markTaskDone(Map<String, dynamic> task) async {
+  await Supabase.instance.client
+      .from('team_tasks')
+      .update({'complete': true})
+      .eq('id', task['id']);
+  await _fetchMyAssignedTasksEvents();
+  _calculateTaskStats(myTasks);
+  setState(() {});
+}
+
+Future<void> _editEvent(Map<String, dynamic> event) async {
+  await showEditEventDialog(event);
+  await _fetchAllTeamTasksEvents();
+  setState(() {});
+}
+
+Future<void> _deleteEvent(Map<String, dynamic> event) async {
+  // First, delete all relations for this event
+  await Supabase.instance.client
+      .from('teamEvent_user_rel')
+      .delete()
+      .eq('Event_ID', event['id']);
+  // Then, delete the event itself
+  await Supabase.instance.client
+      .from('team_events')
+      .delete()
+      .eq('id', event['id']);
+  await _fetchAllTeamTasksEvents();
+  setState(() {});
+}
+
+Future<void> _markEventDone(Map<String, dynamic> event) async {
+  // Mark as complete
+  await Supabase.instance.client
+      .from('team_events')
+      .update({'complete': true})
+      .eq('id', event['id']);
+  // Delete relations first
+  await Supabase.instance.client
+      .from('teamEvent_user_rel')
+      .delete()
+      .eq('Event_ID', event['id']);
+  // Then delete the event
+  await Supabase.instance.client
+      .from('team_events')
+      .delete()
+      .eq('id', event['id']);
+  await _fetchAllTeamTasksEvents();
+  setState(() {});
+}
+
   Widget _buildEventList() {
     final eventsToShow = isLeader ? teamEvents : myEvents;
     if (eventsToShow.isEmpty) {
@@ -642,17 +957,18 @@ class _TeamDashboardState extends State<TeamDashboard> {
           itemBuilder: (context, index) {
             final event = displayEvents[index];
             return EventCard(
-              event: event,
-              isTeamLeader: isLeader,
-              onEdit: () {/* your edit logic */},
-              onDelete: () {/* your delete logic */},
+                event: event,
+                isTeamLeader: isLeader,
+                onEdit: () => _editEvent(event),
+                onDelete: () => _deleteEvent(event),
+                onMarkDone: () => _markEventDone(event),
             );
           },
         ),
         if (!showAllEvents && eventsToShow.length > 2)
           TextButton(
             onPressed: () {
-              //navigate to events page or show all events
+              _navigateToTaskList(context, filter: 'total');
             },
             child: Text('View More'),
           ),
@@ -661,43 +977,53 @@ class _TeamDashboardState extends State<TeamDashboard> {
   }
 
   Widget _buildTaskList() {
-    final tasksToShow = isLeader ? teamTasks : myTasks;
-    if (tasksToShow.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Center(
-            child: Text('No tasks available.',
-                style: TextStyle(color: Colors.grey))),
-      );
-    }
-    final displayTasks =
-        showAllTasks ? tasksToShow : tasksToShow.take(2).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ListView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          itemCount: displayTasks.length,
-          itemBuilder: (context, index) {
-            final task = displayTasks[index];
-            return TaskCard(
-              task: task,
-              isTeamLeader: isLeader,
-              // ...other params...
-            );
-          },
-        ),
-        if (!showAllTasks && tasksToShow.length > 2)
-          TextButton(
-            onPressed: () {
-              //navigate to tasks page or show all tasks
-            },
-            child: Text('View More'),
-          ),
-      ],
+  final now = DateTime.now();
+  final tasksToShow = (isLeader ? teamTasks : myTasks)
+      .where((task) {
+        final start = DateTime.tryParse(task['start_date'] ?? '');
+        final due = DateTime.tryParse(task['due_date'] ?? '');
+        if (start == null || due == null) return false;
+        return !now.isBefore(start) && !now.isAfter(due);
+      })
+      .toList();
+
+  if (tasksToShow.isEmpty) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Text('No tasks available.', style: TextStyle(color: Colors.grey)),
+      ),
     );
   }
+  final displayTasks = showAllTasks ? tasksToShow : tasksToShow.take(2).toList();
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      ListView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        itemCount: displayTasks.length,
+        itemBuilder: (context, index) {
+          final task = displayTasks[index];
+          return TaskCard(
+            task: task,
+            isTeamLeader: isLeader,
+            onEdit: () => _editTask(task),
+            onDelete: () => _deleteTask(task),
+            onMarkDone: () => _markTaskDone(task),
+          );
+        },
+      ),
+      if (!showAllTasks && tasksToShow.length > 2)
+        TextButton(
+          onPressed: () {
+            _navigateToTaskList(context, filter: 'total');
+          },
+          child: Text('View More'),
+        ),
+    ],
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -708,7 +1034,6 @@ class _TeamDashboardState extends State<TeamDashboard> {
           IconButton(
             icon: Icon(Icons.settings),
             onPressed: () {
-              // Navigate to settings page or handle settings action
               showMenu(
                 context: context,
                 position: RelativeRect.fromLTRB(100, 50, 0, 0),
@@ -722,6 +1047,10 @@ class _TeamDashboardState extends State<TeamDashboard> {
                           value: 'delete',
                           child: Text('Delete Team'),
                         ),
+                        PopupMenuItem(
+                          value: 'show_code',
+                          child: Text('Show Team Code'),
+                        ),
                       ]
                     : [
                         PopupMenuItem(
@@ -731,14 +1060,13 @@ class _TeamDashboardState extends State<TeamDashboard> {
                       ],
               ).then((value) {
                 if (value == 'edit') {
-                  // Handle edit team
                   showEditTeamDialog();
                 } else if (value == 'delete') {
-                  // Handle delete team
                   deleteTeam();
                 } else if (value == 'leave') {
-                  // Handle leave team
                   leaveTeam();
+                } else if (value == 'show_code' && isLeader) {
+                  showTeamCodeDialog();
                 }
               });
             },
@@ -751,16 +1079,27 @@ class _TeamDashboardState extends State<TeamDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildStatCard('Total Tasks', '$totalTasks'),
-                  SizedBox(width: 12),
-                  _buildStatCard('Completed', '$completedTasks'),
-                  SizedBox(width: 12),
-                  _buildStatCard('In Progress', '$inProgressTasks'),
-                ],
-              ),
+              SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => _navigateToTaskList(context, filter: 'total'),
+                          child: _buildStatCard('Total Tasks', '$totalTasks'),
+                        ),
+                        SizedBox(width: 5),
+                        GestureDetector(
+                          onTap: () => _navigateToTaskList(context, filter: 'completed'),
+                          child: _buildStatCard('Completed', '$completedTasks'),
+                        ),
+                        SizedBox(width: 5),
+                        GestureDetector(
+                          onTap: () => _navigateToTaskList(context, filter: 'inprogress'),
+                          child: _buildStatCard('In Progress', '$inProgressTasks'),
+                        ),
+                      ],
+                    ),
+                  ),
               SizedBox(height: 10),
               _buildTeamMembersPreview(),
               SizedBox(height: 10),
@@ -909,6 +1248,7 @@ class _TeamDashboardState extends State<TeamDashboard> {
         print(result);
         if (result == true) {
           await _fetchAllTeamTasksEvents();
+          _calculateTaskStats(teamTasks);
           setState(() {});
         }
       },
@@ -929,6 +1269,7 @@ class TaskCard extends StatelessWidget {
   final bool isTeamLeader;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onMarkDone;
 
   const TaskCard({
     Key? key,
@@ -936,6 +1277,7 @@ class TaskCard extends StatelessWidget {
     required this.isTeamLeader,
     this.onEdit,
     this.onDelete,
+    this.onMarkDone,
   }) : super(key: key);
 
   @override
@@ -953,12 +1295,12 @@ class TaskCard extends StatelessWidget {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color:
-                  task['status'] == 'In Progress' ? Colors.blue : Colors.orange,
+              color: task['complete'] == true ? Colors.green : Colors.orange,
               shape: BoxShape.circle,
             ),
           ),
           SizedBox(width: 12),
+          // Expanded is a direct child of Row here
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -979,7 +1321,7 @@ class TaskCard extends StatelessWidget {
                     ),
                   ),
                 Text(
-                  'Due: ${task['dueDate'] ?? ''}',
+                  'Due: ${task['due_date'] ?? ''}',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -1002,6 +1344,11 @@ class TaskCard extends StatelessWidget {
                 ),
               ],
             ),
+          if (!isTeamLeader && !(task['complete'] ?? false))
+            IconButton(
+              icon: Icon(Icons.check_circle, color: Colors.green),
+              onPressed: onMarkDone,
+            ),
         ],
       ),
     );
@@ -1013,6 +1360,7 @@ class EventCard extends StatelessWidget {
   final bool isTeamLeader;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onMarkDone;
 
   const EventCard({
     Key? key,
@@ -1020,19 +1368,11 @@ class EventCard extends StatelessWidget {
     required this.isTeamLeader,
     this.onEdit,
     this.onDelete,
+    this.onMarkDone,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // You can define your own logic for event status color if needed
-    Color statusColor = Colors.orange;
-    // Example: mark orange if event is in the past
-    final now = DateTime.now();
-    final eventDate = DateTime.tryParse(event['date'] ?? '');
-    if (eventDate != null && eventDate.isBefore(now)) {
-      statusColor = Colors.red;
-    }
-
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.all(12),
@@ -1046,11 +1386,12 @@ class EventCard extends StatelessWidget {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: statusColor,
+              color: event['complete'] == true ? Colors.green : Colors.orange,
               shape: BoxShape.circle,
             ),
           ),
           SizedBox(width: 12),
+          // Expanded is a direct child of Row here
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1099,6 +1440,11 @@ class EventCard extends StatelessWidget {
                   icon: Icon(Icons.delete, size: 20),
                   onPressed: onDelete,
                 ),
+                if (!(event['complete'] ?? false))
+                  IconButton(
+                    icon: Icon(Icons.check_circle, color: Colors.green),
+                    onPressed: onMarkDone,
+                  ),
               ],
             ),
         ],

@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project/pages/login.dart';
 import 'package:project/pages/register.dart';
-import 'package:project/pages/forgotPassword.dart';
-import 'package:project/pages/resetPassword.dart';
-import 'package:project/pages/sixDigit.dart';
 import 'package:project/pages/dashboard.dart';
 import 'package:project/pages/teams.dart';
 import 'package:project/pages/calendar.dart';
@@ -31,9 +28,6 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegisterScreen(),
-        '/forgotpassword': (context) => Forgotpassword(),
-        '/sixdigit': (context) => SixDigitScreen(),
-        '/resetpassword': (context) => Resetpassword(),
         '/dashboard': (context) => DashboardScreen(),
         '/teams': (context) => TeamsScreen(),
         '/calendar': (context) => CalendarScreen(),
