@@ -213,12 +213,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _fetchTasksFromDb() async {
     final profileId = await _getProfileId();
+    final today = DateTime.now();
     if (profileId == null) return;
     // For testing: remove date filters so that all tasks are returned.
+    final todayStr = today.toIso8601String().split('T').first;
     final data = await Supabase.instance.client
-        .from('tasks')
-        .select('id, title, description, start_date, due_date, complete')
-        .eq('UID', profileId) as List<dynamic>?;
+    .from('tasks')
+    .select('id, title, description, start_date, due_date, complete')
+    .eq('UID', profileId)
+    .lte('start_date', todayStr)
+    .gte('due_date', todayStr) as List<dynamic>;
 
     setState(() {
       tasks = data

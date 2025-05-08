@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:project/pages/filteredTasks.dart';
+import 'package:project/pages/teamMember.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum TaskStatus { pending, inProgress, completed, overdue }
@@ -915,6 +916,24 @@ Future<void> _deleteEvent(Map<String, dynamic> event) async {
   setState(() {});
 }
 
+Future<void> _removeMemberFromTeam(Map<String, dynamic> member) async {
+  await Supabase.instance.client
+      .from('TeamTask_user_rel')
+      .delete()
+      .eq('UID', member['UID'])
+      .eq('TID', widget.tid);
+  await Supabase.instance.client
+      .from('teamEvent_user_rel')
+      .delete()
+      .eq('UID', member['UID'])
+      .eq('TID', widget.tid);
+  await Supabase.instance.client
+      .from('team_user_rel')
+      .delete()
+      .eq('UID', member['UID'])
+      .eq('TID', widget.tid);
+}
+
 Future<void> _markEventDone(Map<String, dynamic> event) async {
   // Mark as complete
   await Supabase.instance.client
@@ -1101,7 +1120,21 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
                     ),
                   ),
               SizedBox(height: 10),
-              _buildTeamMembersPreview(),
+              GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TeamMembersPage(
+                          teamMembers: teamMembers,
+                          isLeader: isLeader,
+                          teamId: widget.tid,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _buildTeamMembersPreview(),
+                ),
               SizedBox(height: 10),
               _buildTaskList(),
               _buildEventList(),
