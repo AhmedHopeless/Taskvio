@@ -55,6 +55,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         if (start != null) {
           end = adjustEndTime(start, end);
           appointments.add(Appointment(
+
             startTime: start,
             endTime: end,
             subject: task['title'] ?? 'Task',
@@ -173,20 +174,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
         elevation: 0,
         title: Text(
           "Calendar",
           style: GoogleFonts.poppins(
               color: Colors.black, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-              onPressed: () {},
-              icon: Icon(Icons.notifications_none, color: Colors.black)),
-          IconButton(
-              onPressed: () {},
-              icon: Icon(Icons.person_outline, color: Colors.black)),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

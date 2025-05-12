@@ -129,7 +129,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               Hero(
                 tag: "logo",
-                child: Icon(Icons.app_registration_outlined, size: 64, color: Color(0xFF3F51B5)),
+                child: Image.asset(
+                  'assets/images/Taskvio_logo.PNG',
+                  width: 150,
+                  height: 150,
+                ),
               ),
               const SizedBox(height: 16),
               Text(

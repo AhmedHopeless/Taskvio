@@ -70,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     }
   }
+  
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -88,7 +89,11 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Hero(
                 tag: "logo",
-                child: Icon(Icons.app_registration_outlined, size: 64, color: Color(0xFF3F51B5)),
+                child: Image.asset(
+                  'assets/images/Taskvio_logo.PNG',
+                  width: 150,
+                  height: 150,
+                ),  
               ),
               const SizedBox(height: 16),
               Text(

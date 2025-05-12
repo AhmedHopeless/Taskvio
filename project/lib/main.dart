@@ -8,6 +8,7 @@ import 'package:project/pages/calendar.dart';
 import 'package:project/pages/focus.dart';
 import 'package:project/pages/settings.dart';
 import 'package:project/pages/team_dashboard.dart';
+import 'package:project/pages/splash_screen.dart';
 void main() async {
   await Supabase.initialize(
     url: 'https://msfnqnwhkmejglouqhqp.supabase.co',
@@ -20,11 +21,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Login Screen',
+      title: 'Taskvio',
       theme: ThemeData(
         primaryColor: Color(0xFF133E87), // Primary color set to #133E87
       ),
-      home: LoginScreen(),
+      debugShowCheckedModeBanner: false,
+      home: const SplashScreen(),
       routes: {
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegisterScreen(),

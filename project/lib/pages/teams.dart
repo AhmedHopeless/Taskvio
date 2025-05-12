@@ -424,7 +424,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         automaticallyImplyLeading: false,
-        title: Text("Teams (${filteredTeams.length})"),
+        title: Text(
+          "Teams (${filteredTeams.length})",
+          style: GoogleFonts.poppins(
+              color: Colors.black, fontWeight: FontWeight.bold),
+        ),
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator())

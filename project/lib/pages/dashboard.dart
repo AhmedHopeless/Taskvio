@@ -46,10 +46,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _toggleTaskFinished(int index) async {
     final task = tasks[index];
     try {
-      await Supabase.instance.client
-          .from('tasks')
-          .update({'complete': !(task['completed'] ?? false)})
-          .eq('id', task['id']);
+      await Supabase.instance.client.from('tasks').update(
+          {'complete': !(task['completed'] ?? false)}).eq('id', task['id']);
       await _fetchTasksFromDb();
     } catch (e) {
       _showSnackBar("Error updating task: $e");
@@ -101,10 +99,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _toggleEventFinished(int index) async {
     final event = events[index];
     try {
-      await Supabase.instance.client
-          .from('events')
-          .update({'complete': !(event['completed'] ?? false)})
-          .eq('id', event['id']);
+      await Supabase.instance.client.from('events').update(
+          {'complete': !(event['completed'] ?? false)}).eq('id', event['id']);
       await _fetchEventsFromDb();
     } catch (e) {
       _showSnackBar("Error updating event: $e");
@@ -128,7 +124,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       if (_editingEventId != null) {
         final selectedTime = _selectedEndDate!;
-        final formattedTime = "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}:00";
+        final formattedTime =
+            "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}:00";
         await Supabase.instance.client.from('events').update({
           'title': _titleController.text,
           'description': _notesController.text,
@@ -146,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TasksScreen(tasks: tasks), // tasks already filtered for today
+        builder: (_) => TasksScreen(), // tasks already filtered for today
       ),
     );
   }
@@ -155,7 +152,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EventsScreen(events: events), // events already filtered for today
+        builder: (_) => EventsScreen(), // events already filtered for today
       ),
     );
   }
@@ -167,6 +164,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final TextEditingController _notesController = TextEditingController();
   DateTime? _selectedStartDate;
   DateTime? _selectedEndDate;
+  TimeOfDay? _selectedTime; // Added to store TimeOfDay
+  final TextEditingController _timeController =
+      TextEditingController(); // Added to display time
   String _selectedType = 'Task';
   List<Map<String, dynamic>> tasks = [];
   List<Map<String, dynamic>> events = [];
@@ -178,20 +178,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int? _editingEventId; // <-- Add this for saving event's unique id
 
   Future<int?> _getProfileId() async {
-  final user = Supabase.instance.client.auth.currentUser;
-  if (user == null) return null;
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return null;
 
-  final data = await Supabase.instance.client
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1) as List<dynamic>?;
+    final data = await Supabase.instance.client
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1) as List<dynamic>?;
 
-  if (data != null && data.isNotEmpty) {
-    return data.first['id'] as int;
+    if (data != null && data.isNotEmpty) {
+      return data.first['id'] as int;
+    }
+    return null;
   }
-  return null;
-}
 
   // Supabase: Fetch first name for greeting.
   Future<String> _fetchFirstName() async {
@@ -218,11 +218,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // For testing: remove date filters so that all tasks are returned.
     final todayStr = today.toIso8601String().split('T').first;
     final data = await Supabase.instance.client
-    .from('tasks')
-    .select('id, title, description, start_date, due_date, complete')
-    .eq('UID', profileId)
-    .lte('start_date', todayStr)
-    .gte('due_date', todayStr) as List<dynamic>;
+        .from('tasks')
+        .select('id, title, description, start_date, due_date, complete')
+        .eq('UID', profileId)
+        .lte('start_date', todayStr)
+        .gte('due_date', todayStr) as List<dynamic>;
 
     setState(() {
       tasks = data
@@ -259,18 +259,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'title': e['title'],
                     'description': e['description'],
                     'taskDate': DateTime.parse(e['date']),
-                    'dueDate': _combineDateAndTime(e['date'], e['time']),
+                    'time': e['time']?.toString(),
                     'completed': e['complete'],
                   })
               .toList() ??
           [];
     });
   }
+
   void _showSnackBar(String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
-}
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   Future<void> _createTask() async {
     final profileId = await _getProfileId();
@@ -290,18 +291,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  String formatTimeOfDay(TimeOfDay tod) {
+    final hour = tod.hour.toString().padLeft(2, '0');
+    final minute = tod.minute.toString().padLeft(2, '0');
+    return '$hour:$minute:00';
+  }
+
   Future<void> _createEvent() async {
     final profileId = await _getProfileId();
-    if (profileId == null) return;
+    if (profileId == null ||
+        _selectedStartDate == null ||
+        _selectedTime == null) {
+      _showSnackBar("Please fill all required fields.");
+      return;
+    }
     try {
-      final selectedTime = _selectedEndDate!; // This should be a DateTime
-
-      final formattedTime = "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}:00";
       await Supabase.instance.client.from('events').insert({
         'title': _titleController.text,
         'description': _notesController.text,
         'date': _selectedStartDate!.toIso8601String().split('T').first,
-        'time': formattedTime,
+        'time': formatTimeOfDay(_selectedTime!), // Use your helper for HH:mm:ss
         'complete': false,
         'UID': profileId,
       });
@@ -313,7 +322,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _logout() async {
     await Supabase.instance.client.auth.signOut();
-    Navigator.pushReplacementNamed(context, '/login'); // Adjust the route as needed.
+    Navigator.pushReplacementNamed(
+        context, '/login'); // Adjust the route as needed.
   }
 
   // Greeting widget at top.
@@ -372,7 +382,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       int totalTasks = tasks.length;
       int completedTasks =
           tasks.where((task) => task['completed'] == true).length;
-      int percent = totalTasks > 0 ? ((completedTasks / totalTasks) * 100).round() : 0;
+      int percent =
+          totalTasks > 0 ? ((completedTasks / totalTasks) * 100).round() : 0;
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -567,8 +578,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           fontWeight: FontWeight.bold, fontSize: 14)),
                   if (subtitle.isNotEmpty)
                     Text(subtitle,
-                        style: TextStyle(
-                            color: Colors.grey[600], fontSize: 13)),
+                        style:
+                            TextStyle(color: Colors.grey[600], fontSize: 13)),
                 ],
               ),
             )
@@ -644,7 +655,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     controller: TextEditingController(
                       text: _selectedStartDate == null
                           ? ''
-                          : _selectedStartDate!.toLocal().toString().split(' ')[0],
+                          : _selectedStartDate!
+                              .toLocal()
+                              .toString()
+                              .split(' ')[0],
                     ),
                     readOnly: true,
                     decoration: InputDecoration(
@@ -678,7 +692,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     controller: TextEditingController(
                       text: _selectedEndDate == null
                           ? ''
-                          : _selectedEndDate!.toLocal().toString().split(' ')[0],
+                          : _selectedEndDate!
+                              .toLocal()
+                              .toString()
+                              .split(' ')[0],
                     ),
                     readOnly: true,
                     decoration: InputDecoration(
@@ -729,12 +746,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             if (_editingTaskIndex == null) {
                               await _createTask();
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Task added', style: GoogleFonts.poppins())),
+                                SnackBar(
+                                    content: Text('Task added',
+                                        style: GoogleFonts.poppins())),
                               );
                             } else {
                               await _updateTask();
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Task updated', style: GoogleFonts.poppins())),
+                                SnackBar(
+                                    content: Text('Task updated',
+                                        style: GoogleFonts.poppins())),
                               );
                             }
                             setState(() {
@@ -749,7 +770,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Please enter a task name', style: GoogleFonts.poppins()),
+                                content: Text('Please enter a task name',
+                                    style: GoogleFonts.poppins()),
                               ),
                             );
                           }
@@ -834,7 +856,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     controller: TextEditingController(
                       text: _selectedStartDate == null
                           ? ''
-                          : _selectedStartDate!.toLocal().toString().split(' ')[0],
+                          : _selectedStartDate!
+                              .toLocal()
+                              .toString()
+                              .split(' ')[0],
                     ),
                     readOnly: true,
                     decoration: InputDecoration(
@@ -865,11 +890,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 16),
                   // Event Time Field
                   TextField(
-                    controller: TextEditingController(
-                      text: _selectedEndDate == null
-                          ? ''
-                          : _selectedEndDate!.toLocal().toString(),
-                    ),
+                    controller: _timeController,
                     readOnly: true,
                     decoration: InputDecoration(
                       labelText: 'Event Time',
@@ -889,13 +910,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       );
                       if (pickedTime != null) {
                         setState(() {
-                          _selectedEndDate = DateTime(
-                            DateTime.now().year,
-                            DateTime.now().month,
-                            DateTime.now().day,
-                            pickedTime.hour,
-                            pickedTime.minute,
-                          );
+                          _selectedTime =
+                              pickedTime; // Store TimeOfDay, not DateTime
+                          _timeController.text =
+                              pickedTime.format(context); // Show only time
                         });
                       }
                     },
@@ -923,12 +941,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             if (_editingEventIndex == null) {
                               await _createEvent();
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Event added', style: GoogleFonts.poppins())),
+                                SnackBar(
+                                    content: Text('Event added',
+                                        style: GoogleFonts.poppins())),
                               );
                             } else {
                               await _updateEvent();
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Event updated', style: GoogleFonts.poppins())),
+                                SnackBar(
+                                    content: Text('Event updated',
+                                        style: GoogleFonts.poppins())),
                               );
                             }
                             setState(() {
@@ -940,17 +962,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               _notesController.clear();
                               _selectedStartDate = null;
                               _selectedEndDate = null;
+                              _timeController.clear();
+                              _selectedTime = null;
                             });
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Please enter an event name', style: GoogleFonts.poppins()),
+                                content: Text('Please enter an event name',
+                                    style: GoogleFonts.poppins()),
                               ),
                             );
                           }
                         },
                         child: Text(
-                          _editingEventIndex == null ? 'Add Event' : 'Save Event',
+                          _editingEventIndex == null
+                              ? 'Add Event'
+                              : 'Save Event',
                           style: GoogleFonts.poppins(),
                         ),
                       ),
@@ -964,22 +991,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _formatDateTime(DateTime dateTime) {
-  // Basic formatting: you can adjust this format as needed.
-  return dateTime.toLocal().toString().substring(0, 16);
-}
+    // Basic formatting: you can adjust this format as needed.
+    return dateTime.toLocal().toString().substring(0, 16);
+  }
 
-DateTime _combineDateAndTime(String date, String time) {
-  final datePart = DateTime.parse(date);
-  final timeParts = time.split(':');
-  return DateTime(
-    datePart.year,
-    datePart.month,
-    datePart.day,
-    int.parse(timeParts[0]),
-    int.parse(timeParts[1]),
-    int.parse(timeParts[2]),
-  );
-}
+  DateTime _combineDateAndTime(String date, String time) {
+    final datePart = DateTime.parse(date);
+    final timeParts = time.split(':');
+    return DateTime(
+      datePart.year,
+      datePart.month,
+      datePart.day,
+      int.parse(timeParts[0]),
+      int.parse(timeParts[1]),
+      int.parse(timeParts[2]),
+    );
+  }
 
   Widget _buildTasksList() {
     if (tasks.isEmpty) {
@@ -1015,8 +1042,9 @@ DateTime _combineDateAndTime(String date, String time) {
                       ),
                       if (task['dueDate'] != null)
                         Text(
-                          "Time: ${_formatDateTime(task['dueDate'])}",
-                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                          "Due date: ${_formatDateTime(task['dueDate'])}",
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: Colors.grey),
                         ),
                     ],
                   ),
@@ -1058,12 +1086,12 @@ DateTime _combineDateAndTime(String date, String time) {
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  await Navigator.push(
                     context,
                     PageRouteBuilder(
                       pageBuilder: (context, animation, secondaryAnimation) =>
-                          TasksScreen(tasks: tasks),
+                          TasksScreen(),
                       transitionsBuilder:
                           (context, animation, secondaryAnimation, child) {
                         const begin = Offset(1.0, 0.0);
@@ -1078,6 +1106,7 @@ DateTime _combineDateAndTime(String date, String time) {
                       },
                     ),
                   );
+                  _fetchTasksFromDb();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
@@ -1095,170 +1124,172 @@ DateTime _combineDateAndTime(String date, String time) {
   }
 
   Widget _buildEventsList() {
-  if (events.isEmpty) {
-    return Row(
-      children: [
-        _statusCard("No events for today", "Enjoy your day!"),
-        const SizedBox(width: 12),
-      ],
-    );
-  } else {
-    int previewCount = events.length > 3 ? 3 : events.length;
-    return Column(
-      children: [
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: previewCount,
-          itemBuilder: (context, index) {
-            final event = events[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              child: ListTile(
-                title: Text(event['title'], style: GoogleFonts.poppins()),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event['description'] ?? '',
-                      style: GoogleFonts.poppins(fontSize: 12),
-                    ),
-                    if (event['dueDate'] != null)
-                      Text(
-                        "Time: ${_formatDateTime(event['dueDate'])}",
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
-                      ),
-                  ],
-                ),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _editEvent(index);
-                    } else if (value == 'finish') {
-                      _toggleEventFinished(index);
-                    } else if (value == 'delete') {
-                      _deleteEvent(index);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit', style: GoogleFonts.poppins()),
-                    ),
-                    PopupMenuItem(
-                      value: 'finish',
-                      child: Text(
-                        event['completed'] == true
-                            ? 'Mark as Unfinished'
-                            : 'Mark as Finished',
-                        style: GoogleFonts.poppins(),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text('Delete', style: GoogleFonts.poppins()),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-        if (events.length > 3)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) =>
-                        EventsScreen(events: events),
-                    transitionsBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                      const begin = Offset(1.0, 0.0);
-                      const end = Offset.zero;
-                      final tween = Tween(begin: begin, end: end).chain(
-                        CurveTween(curve: Curves.ease),
-                      );
-                      return SlideTransition(
-                        position: animation.drive(tween),
-                        child: child,
-                      );
-                    },
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
+    if (events.isEmpty) {
+      return Row(
+        children: [
+          _statusCard("No events for today", "Enjoy your day!"),
+          const SizedBox(width: 12),
+        ],
+      );
+    } else {
+      int previewCount = events.length > 3 ? 3 : events.length;
+      return Column(
+        children: [
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: previewCount,
+            itemBuilder: (context, index) {
+              final event = events[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(borderRadius),
                 ),
+                child: ListTile(
+                  title: Text(event['title'], style: GoogleFonts.poppins()),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event['description'] ?? '',
+                        style: GoogleFonts.poppins(fontSize: 12),
+                      ),
+                      if (event['time'] != null)
+                        Text(
+                          "Time: ${event['time'] ?? ''}",
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _editEvent(index);
+                      } else if (value == 'finish') {
+                        _toggleEventFinished(index);
+                      } else if (value == 'delete') {
+                        _deleteEvent(index);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit', style: GoogleFonts.poppins()),
+                      ),
+                      PopupMenuItem(
+                        value: 'finish',
+                        child: Text(
+                          event['completed'] == true
+                              ? 'Mark as Unfinished'
+                              : 'Mark as Finished',
+                          style: GoogleFonts.poppins(),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete', style: GoogleFonts.poppins()),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          if (events.length > 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: ElevatedButton(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          EventsScreen(),
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                        const begin = Offset(1.0, 0.0);
+                        const end = Offset.zero;
+                        final tween = Tween(begin: begin, end: end).chain(
+                          CurveTween(curve: Curves.ease),
+                        );
+                        return SlideTransition(
+                          position: animation.drive(tween),
+                          child: child,
+                        );
+                      },
+                    ),
+                  );
+                  _fetchEventsFromDb();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text("Go to Events Page", style: GoogleFonts.poppins()),
               ),
-              child: Text("Go to Events Page", style: GoogleFonts.poppins()),
             ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildTasksSectionHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          "Tasks",
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        // Show FAB only after at least one task is added.
+        if (tasks.isNotEmpty)
+          FloatingActionButton(
+            onPressed: () {
+              setState(() {
+                _showTaskForm = true;
+              });
+            },
+            mini: true,
+            elevation: 0,
+            backgroundColor: primaryColor,
+            shape: const CircleBorder(side: BorderSide.none),
+            child: const Icon(Icons.add, color: Colors.white),
           ),
       ],
     );
   }
-}
-
-  Widget _buildTasksSectionHeader() {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(
-        "Tasks",
-        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
-      ),
-      // Show FAB only after at least one task is added.
-      if (tasks.isNotEmpty)
-        FloatingActionButton(
-          onPressed: () {
-            setState(() {
-              _showTaskForm = true;
-            });
-          },
-          mini: true,
-          elevation: 0,
-          backgroundColor: primaryColor,
-          shape: const CircleBorder(side: BorderSide.none),
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
-    ],
-  );
-}
 
   // --- Add this new header for Events section ---
-Widget _buildEventsSectionHeader() {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(
-        "Events",
-        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
-      ),
-      // Show FAB only after at least one event is added.
-      if (events.isNotEmpty)
-        FloatingActionButton(
-          onPressed: () {
-            setState(() {
-              _showEventForm = true;
-            });
-          },
-          mini: true,
-          elevation: 0,
-          backgroundColor: primaryColor,
-          shape: const CircleBorder(side: BorderSide.none),
-          child: const Icon(Icons.add, color: Colors.white),
+  Widget _buildEventsSectionHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          "Events",
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-    ],
-  );
-}
+        // Show FAB only after at least one event is added.
+        if (events.isNotEmpty)
+          FloatingActionButton(
+            onPressed: () {
+              setState(() {
+                _showEventForm = true;
+              });
+            },
+            mini: true,
+            elevation: 0,
+            backgroundColor: primaryColor,
+            shape: const CircleBorder(side: BorderSide.none),
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1286,7 +1317,9 @@ Widget _buildEventsSectionHeader() {
             onPressed: () {
               // Implement notification functionality, e.g., show a snackbar or navigate
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Notifications pressed", style: GoogleFonts.poppins())),
+                SnackBar(
+                    content: Text("Notifications pressed",
+                        style: GoogleFonts.poppins())),
               );
             },
           ),
@@ -1343,24 +1376,26 @@ Widget _buildEventsSectionHeader() {
                   _actionCard(
                     icon: Icons.checklist_rounded,
                     title: "Tasks",
-                    percent: tasks.isEmpty 
-                        ? "0%" 
+                    percent: tasks.isEmpty
+                        ? "0%"
                         : "${((tasks.where((t) => t['completed'] == true).length / tasks.length) * 100).round()}%",
                     subtitle: "Completed",
-                    buttonText: tasks.isEmpty ? "Add your first task" : "View Tasks",
-                    onPressed: () {
+                    buttonText:
+                        tasks.isEmpty ? "Add your first task" : "View Tasks",
+                    onPressed: () async {
                       if (tasks.isEmpty) {
                         setState(() {
                           _showTaskForm = !_showTaskForm;
                         });
                       } else {
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           PageRouteBuilder(
-                            pageBuilder: (context, animation, secondaryAnimation) =>
-                                TasksScreen(tasks: tasks),
-                            transitionsBuilder:
-                                (context, animation, secondaryAnimation, child) {
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) =>
+                                    TasksScreen(),
+                            transitionsBuilder: (context, animation,
+                                secondaryAnimation, child) {
                               const begin = Offset(1.0, 0.0);
                               const end = Offset.zero;
                               final tween = Tween(begin: begin, end: end).chain(
@@ -1373,6 +1408,7 @@ Widget _buildEventsSectionHeader() {
                             },
                           ),
                         );
+                        _fetchTasksFromDb();
                       }
                     },
                   ),
@@ -1383,21 +1419,23 @@ Widget _buildEventsSectionHeader() {
                         ? "0%"
                         : "${((events.where((e) => e['completed'] == true).length / events.length) * 100).round()}%",
                     subtitle: "Completed",
-                    buttonText: events.isEmpty ? "Add your first event" : "View events",
-                    onPressed: () {
+                    buttonText:
+                        events.isEmpty ? "Add your first event" : "View events",
+                    onPressed: () async {
                       if (events.isEmpty) {
                         setState(() {
                           _showEventForm = !_showEventForm;
                           _showTaskForm = false;
                         });
                       } else {
-                        Navigator.push(
+                        await Navigator.push(
                           context,
                           PageRouteBuilder(
-                            pageBuilder: (context, animation, secondaryAnimation) =>
-                                EventsScreen(events: events),
-                            transitionsBuilder:
-                                (context, animation, secondaryAnimation, child) {
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) =>
+                                    EventsScreen(),
+                            transitionsBuilder: (context, animation,
+                                secondaryAnimation, child) {
                               const begin = Offset(1.0, 0.0);
                               const end = Offset.zero;
                               final tween = Tween(begin: begin, end: end).chain(
@@ -1410,6 +1448,7 @@ Widget _buildEventsSectionHeader() {
                             },
                           ),
                         );
+                        _fetchEventsFromDb();
                       }
                     },
                   ),
