@@ -4,35 +4,9 @@ import 'package:project/pages/filteredTasks.dart';
 import 'package:project/pages/teamMember.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-enum TaskStatus { pending, inProgress, completed, overdue }
 
-extension TaskStatusExtension on TaskStatus {
-  Color get color {
-    switch (this) {
-      case TaskStatus.pending:
-        return Colors.orange;
-      case TaskStatus.inProgress:
-        return Colors.blue;
-      case TaskStatus.completed:
-        return Colors.green;
-      case TaskStatus.overdue:
-        return Colors.red;
-    }
-  }
 
-  String get label {
-    switch (this) {
-      case TaskStatus.pending:
-        return 'Pending';
-      case TaskStatus.inProgress:
-        return 'In Progress';
-      case TaskStatus.completed:
-        return 'Completed';
-      case TaskStatus.overdue:
-        return 'Overdue';
-    }
-  }
-}
+
 
 class TeamDashboard extends StatefulWidget {
   final int tid;
@@ -153,9 +127,9 @@ class _TeamDashboardState extends State<TeamDashboard> {
 
   Future<void> _fetchAllTeamTasksEvents() async {
     final tasks = await Supabase.instance.client
-      .from('team_tasks')
-      .select()
-      .eq('TID', widget.tid) as List<dynamic>?;
+        .from('team_tasks')
+        .select()
+        .eq('TID', widget.tid) as List<dynamic>?;
     teamTasks = tasks?.cast<Map<String, dynamic>>() ?? [];
     final events = await Supabase.instance.client
         .from('team_events')
@@ -197,25 +171,57 @@ class _TeamDashboardState extends State<TeamDashboard> {
     myEvents = events?.cast<Map<String, dynamic>>() ?? [];
   }
 
-  Future<void> deleteTeam() async {
-    // Only allow if current user is leader (check before calling this)
-    await Supabase.instance.client
-        .from('team_events')
-        .delete()
-        .eq('TID', widget.tid);
-    await Supabase.instance.client
-        .from('team_tasks')
-        .delete()
-        .eq('TID', widget.tid);
-    await Supabase.instance.client
-        .from('team_user_rel')
-        .delete()
-        .eq('TID', widget.tid);
-    await Supabase.instance.client.from('teams').delete().eq('id', widget.tid);
-    // Optionally: delete related tasks/events/relations here
-    Navigator.pop(
-        context, true); // Pass true to indicate the page should refresh
-  }
+Future<void> deleteTeam() async {
+  // Only allow if the current user is the leader (check before calling this)
+
+  // Step 1: Delete related rows in TeamTask_user_rel
+  await Supabase.instance.client
+      .from('TeamTask_user_rel')
+      .delete()
+      .inFilter('TaskID', (await Supabase.instance.client
+          .from('team_tasks')
+          .select('id')
+          .eq('TID', widget.tid) as List<dynamic>)
+          .map((task) => task['id'])
+          .toList());
+
+  // Step 2: Delete related rows in teamEvent_user_rel
+  await Supabase.instance.client
+      .from('teamEvent_user_rel')
+      .delete()
+      .inFilter('Event_ID', (await Supabase.instance.client
+          .from('team_events')
+          .select('id')
+          .eq('TID', widget.tid) as List<dynamic>)
+          .map((event) => event['id'])
+          .toList());
+
+  // Step 3: Delete rows in team_tasks
+  await Supabase.instance.client
+      .from('team_tasks')
+      .delete()
+      .eq('TID', widget.tid);
+
+  // Step 4: Delete rows in team_events
+  await Supabase.instance.client
+      .from('team_events')
+      .delete()
+      .eq('TID', widget.tid);
+
+  // Step 5: Delete rows in team_user_rel
+  await Supabase.instance.client
+      .from('team_user_rel')
+      .delete()
+      .eq('TID', widget.tid);
+
+  // Step 6: Delete the team itself
+  await Supabase.instance.client
+      .from('teams')
+      .delete()
+      .eq('id', widget.tid);
+
+  Navigator.pop(context, true); // Go back after deleting
+}
 
   Future<void> leaveTeam() async {
     // Only allow if current user is NOT leader (check before calling this)
@@ -500,22 +506,22 @@ class _TeamDashboardState extends State<TeamDashboard> {
     return true;
   }
 
-void _navigateToTaskList(BuildContext context, {required String filter}) {
-  final tasks = isLeader ? teamTasks : myTasks;
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => FilteredTaskListPage(
-        tasks: tasks,
-        filter: filter,
-        isTeamLeader: isLeader,
-        onEdit: (task) => _editTask(task),
-        onDelete: (task) => _deleteTask(task),
-        onMarkDone: (task) => _markTaskDone(task),
+  void _navigateToTaskList(BuildContext context, {required String filter}) {
+    final tasks = isLeader ? teamTasks : myTasks;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FilteredTaskListPage(
+          tasks: tasks,
+          filter: filter,
+          isTeamLeader: isLeader,
+          onEdit: (task) => _editTask(task),
+          onDelete: (task) => _deleteTask(task),
+          onMarkDone: (task) => _markTaskDone(task),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Future<bool> showAddEventDialog() async {
     final titleController = TextEditingController();
@@ -665,294 +671,293 @@ void _navigateToTaskList(BuildContext context, {required String filter}) {
   }
 
   Future<void> showEditTaskDialog(Map<String, dynamic> task) async {
-  final titleController = TextEditingController(text: task['title'] ?? '');
-  final descController = TextEditingController(text: task['description'] ?? '');
-  DateTime? startDate = DateTime.tryParse(task['start_date'] ?? '');
-  DateTime? dueDate = DateTime.tryParse(task['due_date'] ?? '');
+    final titleController = TextEditingController(text: task['title'] ?? '');
+    final descController =
+        TextEditingController(text: task['description'] ?? '');
+    DateTime? startDate = DateTime.tryParse(task['start_date'] ?? '');
+    DateTime? dueDate = DateTime.tryParse(task['due_date'] ?? '');
 
-  await showDialog(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: Text('Edit Task'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(labelText: 'Title'),
-              ),
-              SizedBox(height: 12),
-              TextField(
-                controller: descController,
-                decoration: InputDecoration(labelText: 'Description'),
-              ),
-              SizedBox(height: 12),
-              TextField(
-                readOnly: true,
-                controller: TextEditingController(
-                  text: startDate == null ? '' : startDate?.toLocal().toString().split(' ')[0],
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Edit Task'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(labelText: 'Title'),
                 ),
-                decoration: InputDecoration(labelText: 'Start Date'),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: startDate ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      startDate = picked;
-                    });
-                  }
-                },
-              ),
-              SizedBox(height: 12),
-              TextField(
-                readOnly: true,
-                controller: TextEditingController(
-                  text: dueDate == null ? '' : dueDate?.toLocal().toString().split(' ')[0],
+                SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: InputDecoration(labelText: 'Description'),
                 ),
-                decoration: InputDecoration(labelText: 'Due Date'),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: dueDate ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      dueDate = picked;
-                    });
-                  }
-                },
-              ),
-            ],
+                SizedBox(height: 12),
+                TextField(
+                  readOnly: true,
+                  controller: TextEditingController(
+                    text: startDate == null
+                        ? ''
+                        : startDate?.toLocal().toString().split(' ')[0],
+                  ),
+                  decoration: InputDecoration(labelText: 'Start Date'),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: startDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        startDate = picked;
+                      });
+                    }
+                  },
+                ),
+                SizedBox(height: 12),
+                TextField(
+                  readOnly: true,
+                  controller: TextEditingController(
+                    text: dueDate == null
+                        ? ''
+                        : dueDate?.toLocal().toString().split(' ')[0],
+                  ),
+                  decoration: InputDecoration(labelText: 'Due Date'),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: dueDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        dueDate = picked;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await Supabase.instance.client.from('team_tasks').update({
+                  'title': titleController.text,
+                  'description': descController.text,
+                  'start_date': startDate?.toIso8601String().split('T').first,
+                  'due_date': dueDate?.toIso8601String().split('T').first,
+                }).eq('id', task['id']);
+                Navigator.pop(context);
+              },
+              child: Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await Supabase.instance.client
-                  .from('team_tasks')
-                  .update({
-                    'title': titleController.text,
-                    'description': descController.text,
-                    'start_date': startDate?.toIso8601String().split('T').first,
-                    'due_date': dueDate?.toIso8601String().split('T').first,
-                  })
-                  .eq('id', task['id']);
-              Navigator.pop(context);
-            },
-            child: Text('Save'),
-          ),
-        ],
       ),
-    ),
-  );
-}
-
-Future<void> showEditEventDialog(Map<String, dynamic> event) async {
-  final titleController = TextEditingController(text: event['title'] ?? '');
-  final descController = TextEditingController(text: event['description'] ?? '');
-  DateTime? eventDate = DateTime.tryParse(event['date'] ?? '');
-  TimeOfDay? eventTime;
-  if (event['time'] != null && event['time'].toString().contains(':')) {
-    final parts = event['time'].split(':');
-    eventTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    );
   }
 
-  await showDialog(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: Text('Edit Event'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(labelText: 'Title'),
-              ),
-              SizedBox(height: 12),
-              TextField(
-                controller: descController,
-                decoration: InputDecoration(labelText: 'Description'),
-              ),
-              SizedBox(height: 12),
-              TextField(
-                readOnly: true,
-                controller: TextEditingController(
-                  text: eventDate == null
-                      ? ''
-                      : eventDate?.toLocal().toString().split(' ')[0],
+  Future<void> showEditEventDialog(Map<String, dynamic> event) async {
+    final titleController = TextEditingController(text: event['title'] ?? '');
+    final descController =
+        TextEditingController(text: event['description'] ?? '');
+    DateTime? eventDate = DateTime.tryParse(event['date'] ?? '');
+    TimeOfDay? eventTime;
+    if (event['time'] != null && event['time'].toString().contains(':')) {
+      final parts = event['time'].split(':');
+      eventTime =
+          TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Edit Event'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(labelText: 'Title'),
                 ),
-                decoration: InputDecoration(labelText: 'Event Date'),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: eventDate ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      eventDate = picked;
-                    });
-                  }
-                },
-              ),
-              SizedBox(height: 12),
-              TextField(
-                readOnly: true,
-                controller: TextEditingController(
-                  text: eventTime == null ? '' : eventTime?.format(context),
+                SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: InputDecoration(labelText: 'Description'),
                 ),
-                decoration: InputDecoration(labelText: 'Event Time'),
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: eventTime ?? TimeOfDay.now(),
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      eventTime = picked;
-                    });
-                  }
-                },
-              ),
-            ],
+                SizedBox(height: 12),
+                TextField(
+                  readOnly: true,
+                  controller: TextEditingController(
+                    text: eventDate == null
+                        ? ''
+                        : eventDate?.toLocal().toString().split(' ')[0],
+                  ),
+                  decoration: InputDecoration(labelText: 'Event Date'),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: eventDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        eventDate = picked;
+                      });
+                    }
+                  },
+                ),
+                SizedBox(height: 12),
+                TextField(
+                  readOnly: true,
+                  controller: TextEditingController(
+                    text: eventTime == null ? '' : eventTime?.format(context),
+                  ),
+                  decoration: InputDecoration(labelText: 'Event Time'),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: eventTime ?? TimeOfDay.now(),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        eventTime = picked;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final formattedTime = eventTime == null
+                    ? null
+                    : '${eventTime?.hour.toString().padLeft(2, '0')}:${eventTime?.minute.toString().padLeft(2, '0')}:00';
+                await Supabase.instance.client.from('team_events').update({
+                  'title': titleController.text,
+                  'description': descController.text,
+                  'date': eventDate?.toIso8601String().split('T').first,
+                  'time': formattedTime,
+                }).eq('id', event['id']);
+                Navigator.pop(context);
+              },
+              child: Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final formattedTime = eventTime == null
-                  ? null
-                  : '${eventTime?.hour.toString().padLeft(2, '0')}:${eventTime?.minute.toString().padLeft(2, '0')}:00';
-              await Supabase.instance.client
-                  .from('team_events')
-                  .update({
-                    'title': titleController.text,
-                    'description': descController.text,
-                    'date': eventDate?.toIso8601String().split('T').first,
-                    'time': formattedTime,
-                  })
-                  .eq('id', event['id']);
-              Navigator.pop(context);
-            },
-            child: Text('Save'),
-          ),
-        ],
       ),
-    ),
-  );
-}
+    );
+  }
 
   Future<void> _editTask(Map<String, dynamic> task) async {
-  // Show your edit dialog, then refresh
-  await showEditTaskDialog(task);
-  await _fetchAllTeamTasksEvents();
-  _calculateTaskStats(teamTasks);
-  setState(() {});
-}
+    // Show your edit dialog, then refresh
+    await showEditTaskDialog(task);
+    await _fetchAllTeamTasksEvents();
+    _calculateTaskStats(teamTasks);
+    setState(() {});
+  }
 
-Future<void> _deleteTask(Map<String, dynamic> task) async {
-  // First, delete all relations for this task
-  await Supabase.instance.client
-      .from('TeamTask_user_rel')
-      .delete()
-      .eq('TaskID', task['id']);
-  // Then, delete the task itself
-  await Supabase.instance.client
-      .from('team_tasks')
-      .delete()
-      .eq('id', task['id']);
-  await _fetchAllTeamTasksEvents();
-  _calculateTaskStats(teamTasks);
-  setState(() {});
-}
+  Future<void> _deleteTask(Map<String, dynamic> task) async {
+    // First, delete all relations for this task
+    await Supabase.instance.client
+        .from('TeamTask_user_rel')
+        .delete()
+        .eq('TaskID', task['id']);
+    // Then, delete the task itself
+    await Supabase.instance.client
+        .from('team_tasks')
+        .delete()
+        .eq('id', task['id']);
+    await _fetchAllTeamTasksEvents();
+    _calculateTaskStats(teamTasks);
+    setState(() {});
+  }
 
-Future<void> _markTaskDone(Map<String, dynamic> task) async {
-  await Supabase.instance.client
-      .from('team_tasks')
-      .update({'complete': true})
-      .eq('id', task['id']);
-  await _fetchMyAssignedTasksEvents();
-  _calculateTaskStats(myTasks);
-  setState(() {});
-}
+  Future<void> _markTaskDone(Map<String, dynamic> task) async {
+    await Supabase.instance.client
+        .from('team_tasks')
+        .update({'complete': true}).eq('id', task['id']);
+    await _fetchMyAssignedTasksEvents();
+    _calculateTaskStats(myTasks);
+    setState(() {});
+  }
 
-Future<void> _editEvent(Map<String, dynamic> event) async {
-  await showEditEventDialog(event);
-  await _fetchAllTeamTasksEvents();
-  setState(() {});
-}
+  Future<void> _editEvent(Map<String, dynamic> event) async {
+    await showEditEventDialog(event);
+    await _fetchAllTeamTasksEvents();
+    setState(() {});
+  }
 
-Future<void> _deleteEvent(Map<String, dynamic> event) async {
-  // First, delete all relations for this event
-  await Supabase.instance.client
-      .from('teamEvent_user_rel')
-      .delete()
-      .eq('Event_ID', event['id']);
-  // Then, delete the event itself
-  await Supabase.instance.client
-      .from('team_events')
-      .delete()
-      .eq('id', event['id']);
-  await _fetchAllTeamTasksEvents();
-  setState(() {});
-}
+  Future<void> _deleteEvent(Map<String, dynamic> event) async {
+    // First, delete all relations for this event
+    await Supabase.instance.client
+        .from('teamEvent_user_rel')
+        .delete()
+        .eq('Event_ID', event['id']);
+    // Then, delete the event itself
+    await Supabase.instance.client
+        .from('team_events')
+        .delete()
+        .eq('id', event['id']);
+    await _fetchAllTeamTasksEvents();
+    setState(() {});
+  }
 
-Future<void> _removeMemberFromTeam(Map<String, dynamic> member) async {
-  await Supabase.instance.client
-      .from('TeamTask_user_rel')
-      .delete()
-      .eq('UID', member['UID'])
-      .eq('TID', widget.tid);
-  await Supabase.instance.client
-      .from('teamEvent_user_rel')
-      .delete()
-      .eq('UID', member['UID'])
-      .eq('TID', widget.tid);
-  await Supabase.instance.client
-      .from('team_user_rel')
-      .delete()
-      .eq('UID', member['UID'])
-      .eq('TID', widget.tid);
-}
+  Future<void> _removeMemberFromTeam(Map<String, dynamic> member) async {
+    await Supabase.instance.client
+        .from('TeamTask_user_rel')
+        .delete()
+        .eq('UID', member['UID'])
+        .eq('TID', widget.tid);
+    await Supabase.instance.client
+        .from('teamEvent_user_rel')
+        .delete()
+        .eq('UID', member['UID'])
+        .eq('TID', widget.tid);
+    await Supabase.instance.client
+        .from('team_user_rel')
+        .delete()
+        .eq('UID', member['UID'])
+        .eq('TID', widget.tid);
+  }
 
-Future<void> _markEventDone(Map<String, dynamic> event) async {
-  // Mark as complete
-  await Supabase.instance.client
-      .from('team_events')
-      .update({'complete': true})
-      .eq('id', event['id']);
-  // Delete relations first
-  await Supabase.instance.client
-      .from('teamEvent_user_rel')
-      .delete()
-      .eq('Event_ID', event['id']);
-  // Then delete the event
-  await Supabase.instance.client
-      .from('team_events')
-      .delete()
-      .eq('id', event['id']);
-  await _fetchAllTeamTasksEvents();
-  setState(() {});
-}
+  Future<void> _markEventDone(Map<String, dynamic> event) async {
+    // Mark as complete
+    await Supabase.instance.client
+        .from('team_events')
+        .update({'complete': true}).eq('id', event['id']);
+    // Delete relations first
+    await Supabase.instance.client
+        .from('teamEvent_user_rel')
+        .delete()
+        .eq('Event_ID', event['id']);
+    // Then delete the event
+    await Supabase.instance.client
+        .from('team_events')
+        .delete()
+        .eq('id', event['id']);
+    await _fetchAllTeamTasksEvents();
+    setState(() {});
+  }
 
   Widget _buildEventList() {
     final eventsToShow = isLeader ? teamEvents : myEvents;
@@ -967,7 +972,7 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
     final displayEvents =
         showAllEvents ? eventsToShow : eventsToShow.take(2).toList();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      
       children: [
         ListView.builder(
           shrinkWrap: true,
@@ -976,11 +981,11 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
           itemBuilder: (context, index) {
             final event = displayEvents[index];
             return EventCard(
-                event: event,
-                isTeamLeader: isLeader,
-                onEdit: () => _editEvent(event),
-                onDelete: () => _deleteEvent(event),
-                onMarkDone: () => _markEventDone(event),
+              event: event,
+              isTeamLeader: isLeader,
+              onEdit: () => _editEvent(event),
+              onDelete: () => _deleteEvent(event),
+              onMarkDone: () => _markEventDone(event),
             );
           },
         ),
@@ -996,53 +1001,53 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
   }
 
   Widget _buildTaskList() {
-  final now = DateTime.now();
-  final tasksToShow = (isLeader ? teamTasks : myTasks)
-      .where((task) {
-        final start = DateTime.tryParse(task['start_date'] ?? '');
-        final due = DateTime.tryParse(task['due_date'] ?? '');
-        if (start == null || due == null) return false;
-        return !now.isBefore(start) && !now.isAfter(due);
-      })
-      .toList();
+    final now = DateTime.now();
+    final tasksToShow = (isLeader ? teamTasks : myTasks).where((task) {
+      final start = DateTime.tryParse(task['start_date'] ?? '');
+      final due = DateTime.tryParse(task['due_date'] ?? '');
+      if (start == null || due == null) return false;
+      return !now.isBefore(start) && !now.isAfter(due);
+    }).toList();
 
-  if (tasksToShow.isEmpty) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Center(
-        child: Text('No tasks available.', style: TextStyle(color: Colors.grey)),
-      ),
+    if (tasksToShow.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child:
+              Text('No tasks available.', style: TextStyle(color: Colors.grey)),
+        ),
+      );
+    }
+    final displayTasks =
+        showAllTasks ? tasksToShow : tasksToShow.take(2).toList();
+    return Column(
+      
+      children: [
+        ListView.builder(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          itemCount: displayTasks.length,
+          itemBuilder: (context, index) {
+            final task = displayTasks[index];
+            return TaskCard(
+              task: task,
+              isTeamLeader: isLeader,
+              onEdit: () => _editTask(task),
+              onDelete: () => _deleteTask(task),
+              onMarkDone: () => _markTaskDone(task),
+            );
+          },
+        ),
+        if (!showAllTasks && tasksToShow.length > 2)
+          TextButton(
+            onPressed: () {
+              _navigateToTaskList(context, filter: 'total');
+            },
+            child: Text('View More'),
+          ),
+      ],
     );
   }
-  final displayTasks = showAllTasks ? tasksToShow : tasksToShow.take(2).toList();
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      ListView.builder(
-        shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        itemCount: displayTasks.length,
-        itemBuilder: (context, index) {
-          final task = displayTasks[index];
-          return TaskCard(
-            task: task,
-            isTeamLeader: isLeader,
-            onEdit: () => _editTask(task),
-            onDelete: () => _deleteTask(task),
-            onMarkDone: () => _markTaskDone(task),
-          );
-        },
-      ),
-      if (!showAllTasks && tasksToShow.length > 2)
-        TextButton(
-          onPressed: () {
-            _navigateToTaskList(context, filter: 'total');
-          },
-          child: Text('View More'),
-        ),
-    ],
-  );
-}
 
   @override
   Widget build(BuildContext context) {
@@ -1051,13 +1056,13 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         title: Text(
-          teamInfo?['name'] ?? 'Team Dashboard',
-           style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
+          teamInfo?['name'] ?? ' ',
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.settings),
@@ -1108,42 +1113,45 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => _navigateToTaskList(context, filter: 'total'),
-                          child: _buildStatCard('Total Tasks', '$totalTasks'),
-                        ),
-                        SizedBox(width: 5),
-                        GestureDetector(
-                          onTap: () => _navigateToTaskList(context, filter: 'completed'),
-                          child: _buildStatCard('Completed', '$completedTasks'),
-                        ),
-                        SizedBox(width: 5),
-                        GestureDetector(
-                          onTap: () => _navigateToTaskList(context, filter: 'inprogress'),
-                          child: _buildStatCard('In Progress', '$inProgressTasks'),
-                        ),
-                      ],
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () =>
+                          _navigateToTaskList(context, filter: 'total'),
+                      child: _buildStatCard('Total Tasks', '$totalTasks'),
                     ),
-                  ),
+                    SizedBox(width: 5),
+                    GestureDetector(
+                      onTap: () =>
+                          _navigateToTaskList(context, filter: 'completed'),
+                      child: _buildStatCard('Completed', '$completedTasks'),
+                    ),
+                    SizedBox(width: 5),
+                    GestureDetector(
+                      onTap: () =>
+                          _navigateToTaskList(context, filter: 'inprogress'),
+                      child: _buildStatCard('In Progress', '$inProgressTasks'),
+                    ),
+                  ],
+                ),
+              ),
               SizedBox(height: 10),
               GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TeamMembersPage(
-                          teamMembers: teamMembers,
-                          isLeader: isLeader,
-                          teamId: widget.tid,
-                        ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TeamMembersPage(
+                        teamMembers: teamMembers,
+                        isLeader: isLeader,
+                        teamId: widget.tid,
                       ),
-                    );
-                  },
-                  child: _buildTeamMembersPreview(),
-                ),
+                    ),
+                  );
+                },
+                child: _buildTeamMembersPreview(),
+              ),
               SizedBox(height: 10),
               _buildTaskList(),
               _buildEventList(),
@@ -1156,7 +1164,8 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
   }
 
   Widget _buildStatCard(String title, String value) {
-    return Expanded(
+    return SizedBox(
+      width: 128,
       child: Container(
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -1546,11 +1555,11 @@ class _TeamFabState extends State<_TeamFab> {
           heroTag: 'mainFab',
           onPressed: () => setState(() => _showMenu = !_showMenu),
           backgroundColor: Colors.indigo,
-            child: AnimatedIcon(
-              icon: AnimatedIcons.menu_close,
-              color: Colors.white,
-              progress: AlwaysStoppedAnimation(_showMenu ? 1 : 0),
-            ),
+          child: AnimatedIcon(
+            icon: AnimatedIcons.menu_close,
+            color: Colors.white,
+            progress: AlwaysStoppedAnimation(_showMenu ? 1 : 0),
+          ),
         ),
       ],
     );
@@ -1598,7 +1607,7 @@ class _AssignToDropdownState extends State<AssignToDropdown> {
             ),
             child: Row(
               children: [
-                Expanded(
+                Flexible(
                   child: Text(
                     _selectedIds.isEmpty
                         ? 'Assign to...'
