@@ -20,6 +20,82 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _fetchAppointments();
   }
 
+  void _popinfo() {
+    showDialog(
+      context: context,
+      builder: (context) => Center(
+    child: SizedBox(
+      height: 300,
+      child:  AlertDialog(
+          backgroundColor: Colors.white,
+          title: Text('Remember that'),
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text("Tasks"),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text("Events"),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text("Team tasks and events"),
+                ],
+              ),
+            ],
+          ),
+          
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white, backgroundColor: Colors.indigo,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+        ],
+      ),
+    ),
+  ),
+);
+  }
+
   Future<void> _fetchAppointments() async {
     final client = Supabase.instance.client;
     List<Appointment> appointments = [];
@@ -171,7 +247,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
         backgroundColor: Colors.white,
         automaticallyImplyLeading: false,
@@ -181,10 +257,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
           style: GoogleFonts.poppins(
               color: Colors.black, fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_rounded, color: Colors.indigo),
+            onPressed: () {
+              //pop info function
+              _popinfo();
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: SfCalendar(
+          backgroundColor: const Color(0xFFF9FAFB),
+          headerStyle: const CalendarHeaderStyle(
+            backgroundColor: Color(0xFFF9FAFB),
+            textAlign: TextAlign.center,
+            textStyle: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
           view: CalendarView.month,
           dataSource: _TaskDataSource(_appointments),
           monthViewSettings: MonthViewSettings(

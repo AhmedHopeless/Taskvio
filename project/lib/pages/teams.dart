@@ -426,8 +426,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
         automaticallyImplyLeading: false,
         title: Text(
           "Teams (${filteredTeams.length})",
-          style: GoogleFonts.poppins(
-              color: Colors.black, fontWeight: FontWeight.bold),
+           style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
         ),
       ),
       body: isLoading
@@ -555,6 +558,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
             backgroundColor: Colors.indigo,
             child: AnimatedIcon(
               icon: AnimatedIcons.menu_close,
+              color: Colors.white,
               progress: _fabAnimationController,
             ),
           ),

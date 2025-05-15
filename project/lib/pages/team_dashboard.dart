@@ -1047,8 +1047,17 @@ Future<void> _markEventDone(Map<String, dynamic> event) async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: Text(teamInfo?['name'] ?? 'Team Dashboard'),
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+        title: Text(
+          teamInfo?['name'] ?? 'Team Dashboard',
+           style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
         actions: [
           IconButton(
             icon: Icon(Icons.settings),
@@ -1536,7 +1545,12 @@ class _TeamFabState extends State<_TeamFab> {
         FloatingActionButton(
           heroTag: 'mainFab',
           onPressed: () => setState(() => _showMenu = !_showMenu),
-          child: Icon(Icons.add),
+          backgroundColor: Colors.indigo,
+            child: AnimatedIcon(
+              icon: AnimatedIcons.menu_close,
+              color: Colors.white,
+              progress: AlwaysStoppedAnimation(_showMenu ? 1 : 0),
+            ),
         ),
       ],
     );

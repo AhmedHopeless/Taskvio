@@ -18,6 +18,7 @@ class FocusModeScreen extends StatefulWidget {
 }
 
 class _FocusModeScreenState extends State<FocusModeScreen> {
+  int _currentIndex = 3;
   int _focusDuration = 0;
   int _remainingSeconds = 0;
   Timer? _timer;
@@ -298,14 +299,9 @@ Future<void> stopKioskMode() async {
         backgroundColor: Colors.grey[100],
         appBar: AppBar(
           backgroundColor: Colors.white,
+          automaticallyImplyLeading: false,
           elevation: 0,
           title: Text("Focus Mode", style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold)),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.settings, color: Colors.black),
-              onPressed: _showInstalledAppsDialog,
-            ),
-          ],
         ),
         body: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -375,6 +371,60 @@ Future<void> stopKioskMode() async {
             ],
           ),
         ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8),
+          ],
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Colors.indigo,
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          iconSize: 28,
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+            if (index == 0) {
+              // Already on Home (DashboardScreen).
+            } else if (index == 1) {
+              Navigator.pushNamed(context, '/teams');
+            } else if (index == 2) {
+              Navigator.pushNamed(context, '/calendar');
+            } else if (index == 3) {
+              // Navigate to Focus screen.
+              Navigator.pushNamed(context, '/focus');
+            }
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.group),
+              label: 'Teams',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today),
+              label: 'Calendar',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu_book_outlined),
+              label: 'Focus',
+            ),
+          ],
+        ),
+      ),
       ),
     );
   }

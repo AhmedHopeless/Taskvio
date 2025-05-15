@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:project/pages/events.dart';
+import 'package:project/pages/profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:project/pages/teams.dart';
 import 'package:project/pages/tasks.dart';
@@ -1309,49 +1310,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Colors.indigo,
             ),
           ),
-        ), // or any title widget you use
+        ),
         actions: [
-          // Notification Bell Icon
           IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.black),
+            icon: FutureBuilder<String>(
+              future: _fetchFirstName(), // using actual user name fetch
+              builder: (context, snapshot) {
+                String name = snapshot.data ?? "User";
+                String initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+                return CircleAvatar(
+                  backgroundColor: DashboardScreen.primaryColor,
+                  child: Text(initial,
+                      style: GoogleFonts.poppins(color: Colors.white)),
+                );
+              },
+            ),
             onPressed: () {
-              // Implement notification functionality, e.g., show a snackbar or navigate
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text("Notifications pressed",
-                        style: GoogleFonts.poppins())),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
               );
             },
-          ),
-          // Profile Icon with Dropdown Menu
-          PopupMenuButton<String>(
-            icon: CircleAvatar(
-              backgroundColor: DashboardScreen.primaryColor,
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
-            onSelected: (value) {
-              if (value == 'Profile') {
-                // Navigate to Profile Screen
-              } else if (value == 'settings') {
-                Navigator.pushNamed(context, '/settings');
-              } else if (value == 'Logout') {
-                _logout();
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                value: 'Profile',
-                child: Text('Profile', style: GoogleFonts.poppins()),
-              ),
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Text('Settings', style: GoogleFonts.poppins()),
-              ),
-              PopupMenuItem<String>(
-                value: 'Logout',
-                child: Text('Logout', style: GoogleFonts.poppins()),
-              ),
-            ],
           ),
         ],
       ),
