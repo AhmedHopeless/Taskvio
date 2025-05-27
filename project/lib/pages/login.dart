@@ -7,7 +7,7 @@ Route createRoute(Widget page) {
   return PageRouteBuilder(
     pageBuilder: (context, animation, secondaryAnimation) => page,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      const begin = Offset(1.0, 0.0); // Slide from right
+      const begin = Offset(1.0, 0.0);
       const end = Offset.zero;
       const curve = Curves.easeInOut;
 
@@ -30,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isPasswordVisible = false;
   String? _errorText;
-  bool _isLoading = false; // Tracks loading state
+  bool _isLoading = false; 
 
   Future<void> _login() async {
     final email = _emailController.text;
@@ -44,29 +44,25 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() {
-      _isLoading = true; // Show loading indicator
+      _isLoading = true; 
     });
 
     try {
-      // Attempt to log in using Supabase Auth
       final response = await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
       if (response.user != null) {
-        // Login successful, navigate to the dashboard
         Navigator.pushReplacementNamed(context, '/dashboard');
       } else {
-        // Login failed, show error message
         _showSnackBar("Email or password is incorrect");
       }
     } catch (e) {
-      // Handle any errors
       _showSnackBar("An error occurred: $e");
     } finally {
       setState(() {
-        _isLoading = false; // Hide loading indicator
+        _isLoading = false; 
       });
     }
   }
@@ -145,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               const SizedBox(height: 24),
               _isLoading
-                ? CircularProgressIndicator() // Show loading indicator
+                ? CircularProgressIndicator() 
               :SizedBox(
                 width: double.infinity,
                 height: 50,

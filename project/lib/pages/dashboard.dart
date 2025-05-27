@@ -16,10 +16,10 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // Add this state variable to track the current nav index.
+
   int _currentIndex = 0;
 
-  // Brand Colors and Typography (matching new_dashboard.dart look)
+
   static const Color primaryColor = Color(0xFF4F5DD3);
   static const Color lightGreen = Color(0xFFDFF3E3);
 
@@ -36,7 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _notesController.text = task['description'] ?? '';
     _selectedStartDate = task['taskDate'];
     _selectedEndDate = task['dueDate'];
-    // Save the task's unique id.
+
     _editingTaskId = task['id'];
     setState(() {
       _editingTaskIndex = index;
@@ -90,7 +90,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _notesController.text = event['description'] ?? '';
     _selectedStartDate = event['taskDate'];
     _selectedEndDate = event['dueDate'];
-    _editingEventId = event['id']; // Save the event's unique id.
+    _editingEventId = event['id']; 
     setState(() {
       _editingEventIndex = index;
       _showEventForm = true;
@@ -144,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TasksScreen(), // tasks already filtered for today
+        builder: (_) => TasksScreen(), 
       ),
     );
   }
@@ -153,30 +153,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EventsScreen(), // events already filtered for today
+        builder: (_) => EventsScreen(), 
       ),
     );
   }
 
   static const double borderRadius = 16.0;
 
-  // Controllers and state variables (for dialogs, etc.)
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   DateTime? _selectedStartDate;
   DateTime? _selectedEndDate;
-  TimeOfDay? _selectedTime; // Added to store TimeOfDay
+  TimeOfDay? _selectedTime; 
   final TextEditingController _timeController =
-      TextEditingController(); // Added to display time
+      TextEditingController(); 
   String _selectedType = 'Task';
   List<Map<String, dynamic>> tasks = [];
   List<Map<String, dynamic>> events = [];
   bool _showTaskForm = false;
   bool _showEventForm = false;
   int? _editingTaskIndex;
-  int? _editingEventIndex; // <-- Added this for editing events
-  int? _editingTaskId; // <-- Added this for saving task's unique id
-  int? _editingEventId; // <-- Add this for saving event's unique id
+  int? _editingEventIndex; 
+  int? _editingTaskId; 
+  int? _editingEventId;
 
   Future<int?> _getProfileId() async {
     final user = Supabase.instance.client.auth.currentUser;
@@ -216,7 +215,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final profileId = await _getProfileId();
     final today = DateTime.now();
     if (profileId == null) return;
-    // For testing: remove date filters so that all tasks are returned.
+ 
     final todayStr = today.toIso8601String().split('T').first;
     final data = await Supabase.instance.client
         .from('tasks')
@@ -311,7 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'title': _titleController.text,
         'description': _notesController.text,
         'date': _selectedStartDate!.toIso8601String().split('T').first,
-        'time': formatTimeOfDay(_selectedTime!), // Use your helper for HH:mm:ss
+        'time': formatTimeOfDay(_selectedTime!), 
         'complete': false,
         'UID': profileId,
       });
@@ -324,10 +323,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _logout() async {
     await Supabase.instance.client.auth.signOut();
     Navigator.pushReplacementNamed(
-        context, '/login'); // Adjust the route as needed.
+        context, '/login'); 
   }
 
-  // Greeting widget at top.
   Widget _buildGreeting() {
     return FutureBuilder<String>(
       future: _fetchFirstName(),
@@ -422,7 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Add this method to combine tasks and events goals:
+ 
   Widget _buildCombinedGoalsCard() {
     int total = tasks.length + events.length;
     int completedTasks = tasks.where((t) => t['completed'] == true).length;
@@ -499,7 +497,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Updated Action card used for Tasks and Events.
   Widget _actionCard({
     required IconData icon,
     required String title,
@@ -547,7 +544,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Status card for Tasks section.
+ 
   Widget _statusCard(String title, String subtitle, {IconData? icon}) {
     return Expanded(
       child: Container(
@@ -590,7 +587,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Inline task form that appears when _showTaskForm is true.
   Widget _buildInlineTaskForm() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
@@ -791,7 +787,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Inline event form that appears when _showEventForm is true.
+
   Widget _buildInlineEventForm() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
@@ -912,9 +908,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       if (pickedTime != null) {
                         setState(() {
                           _selectedTime =
-                              pickedTime; // Store TimeOfDay, not DateTime
+                              pickedTime; 
                           _timeController.text =
-                              pickedTime.format(context); // Show only time
+                              pickedTime.format(context); 
                         });
                       }
                     },
@@ -992,7 +988,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _formatDateTime(DateTime dateTime) {
-    // Basic formatting: you can adjust this format as needed.
     return dateTime.toLocal().toString().substring(0, 16);
   }
 
@@ -1247,7 +1242,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           "Tasks",
           style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        // Show FAB only after at least one task is added.
         if (tasks.isNotEmpty)
           FloatingActionButton(
             onPressed: () {
@@ -1265,7 +1259,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- Add this new header for Events section ---
   Widget _buildEventsSectionHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1274,7 +1267,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           "Events",
           style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        // Show FAB only after at least one event is added.
         if (events.isNotEmpty)
           FloatingActionButton(
             onPressed: () {
@@ -1314,7 +1306,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: FutureBuilder<String>(
-              future: _fetchFirstName(), // using actual user name fetch
+              future: _fetchFirstName(), 
               builder: (context, snapshot) {
                 String name = snapshot.data ?? "User";
                 String initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
@@ -1348,7 +1340,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 12),
               _buildCombinedGoalsCard(),
               const SizedBox(height: 16),
-              // Side-by-side Action Cards for Tasks & Events
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1434,21 +1425,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Add both inline forms (they can be mutually exclusive if needed)
               _buildInlineTaskForm(),
-              _buildInlineEventForm(), // <-- Add this so the event form appears when _showEventForm is true.
+              _buildInlineEventForm(),
               const SizedBox(height: 16),
               // Tasks list (example placeholder)
               _buildTasksSectionHeader(),
               _buildTasksList(),
               const SizedBox(height: 24),
-              _buildEventsSectionHeader(), // <-- Add this line to include the Events section header
+              _buildEventsSectionHeader(),
               _buildEventsList(),
             ],
           ),
         ),
       ),
-      // Rounded bottom navigation bar with the new Settings item.
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1473,13 +1462,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _currentIndex = index;
             });
             if (index == 0) {
-              // Already on Home (DashboardScreen).
+              
             } else if (index == 1) {
               Navigator.pushNamed(context, '/teams');
             } else if (index == 2) {
               Navigator.pushNamed(context, '/calendar');
             } else if (index == 3) {
-              // Navigate to Focus screen.
               Navigator.pushNamed(context, '/focus');
             }
           },

@@ -14,7 +14,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _repeatPasswordController = TextEditingController();
-   bool _isLoading = false; // Loading state
+   bool _isLoading = false;
 
 
   bool _isPasswordVisible = false;
@@ -44,7 +44,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   });
 
   try {
-    // Create the user in Supabase auth
     final response = await Supabase.instance.client.auth.signUp(
       email: email,
       password: password,
@@ -56,21 +55,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final user = response.user;
     if (user != null) {
-      // Insert additional profile data into your table "profiles"
       final insertResponse = await Supabase.instance.client
           .from('profiles')
           .insert({
             'user_id': user.id,
-            'name': name, // full name
+            'name': name, 
             'email': email,
-            'password': password, // caution: storing raw passwords is not secure
+            'password': password, 
             'created_at': DateTime.now().toIso8601String(),
           });
-
-      // // Check for null or error in the response.
-      // if (insertResponse == null || insertResponse.error != null) {
-      //   throw insertResponse?.error ?? Exception("Insert failed");
-      // }
     }
 
 
@@ -82,8 +75,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Go back to login
+              Navigator.of(context).pop(); 
+              Navigator.of(context).pop(); 
             },
             child: Text("OK"),
           )
@@ -245,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // Go back to login with slide transition
+                  Navigator.of(context).pop();
                 },
                 child: Text(
                   "Already have an account? Log in",

@@ -10,7 +10,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Brand colors matching the dashboard.
   static const Color primaryColor = Color(0xFF4F5DD3);
   static const Color lightGreen = Color(0xFFDFF3E3);
 
@@ -64,14 +63,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (context, snapshot) {
           String name = snapshot.data ?? 'User';
           String initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-          // Retrieve email from the current user.
           final email = Supabase.instance.client.auth.currentUser?.email ?? "No Email";
           return SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: Column(
                 children: [
-                  // Center the profile avatar.
                   Center(
                     child: CircleAvatar(
                       radius: 50,
@@ -87,7 +84,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Center the full name.
                   Center(
                     child: Text(
                       name,
@@ -99,7 +95,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Center the email.
                   Center(
                     child: Text(
                       "Email: $email",

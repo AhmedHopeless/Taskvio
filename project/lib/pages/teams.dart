@@ -87,7 +87,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
       return;
     }
     final teamId = teamData['id'];
-    // Check if already a member
+ 
     final existing = await Supabase.instance.client
         .from('team_user_rel')
         .select()
@@ -112,7 +112,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
     final code = _generateTeamCode();
 
-    // Insert the team and get the inserted row (with id)
+ 
     final teamInsert = await Supabase.instance.client
         .from('teams')
         .insert({
@@ -125,7 +125,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
 
     final teamId = teamInsert['id'];
 
-    // Now insert into team_user_rel
+
     await Supabase.instance.client.from('team_user_rel').insert({
       'UID': profileId,
       'TID': teamId,
@@ -139,7 +139,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   Future<void> _deleteTeam(int teamId) async {
     final profileId = await _getProfileId();
     if (profileId == null) return;
-    // Check if user is leader
+
     final rel = await Supabase.instance.client
         .from('team_user_rel')
         .select('team_leader')
@@ -157,7 +157,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   }
 
   String _generateTeamCode() {
-    // Simple random code generator
+
     final rand = DateTime.now().millisecondsSinceEpoch.remainder(1000000);
     return 'T$rand';
   }
@@ -404,12 +404,11 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
   }
 
   Widget _buildTeamCard(Map<String, dynamic> teamMap, int index) {
-    final team = teamMap['team']; // This is the nested map with name, code, etc.
+    final team = teamMap['team']; 
 
     return ListTile(
       title: Text(team['name'] ?? ''),
       subtitle: Text(team['description'] ?? ''),
-      // ...other widgets
     );
   }
 
@@ -506,7 +505,7 @@ class _TeamsScreenState extends State<TeamsScreen> with SingleTickerProviderStat
                                     MaterialPageRoute(builder: (_) => TeamDashboard(tid: team['id'])),
                                   );
                                   if (result == true) {
-                                    // Team was deleted or left, so refresh the list
+
                                     _fetchUserTeams();
                                   }
                                 },

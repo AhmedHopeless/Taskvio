@@ -192,7 +192,7 @@ Future<void> stopKioskMode() async {
                   title: Text(app.name, style: GoogleFonts.poppins()),
                   trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
                   onTap: isDefaultPhoneApp
-                      ? null // Don't let user remove system dialer
+                      ? null 
                       : () {
                           setState(() {
                             if (_exceptionPackages.contains(pkg)) {
@@ -243,7 +243,7 @@ Future<void> stopKioskMode() async {
                 try {
                   final quizQuestions = await quizService.generateQuizFromPdf(_uploadedFile!);
                   if (!mounted) return;
-                  Navigator.pop(context); // close loading
+                  Navigator.pop(context); 
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -252,7 +252,7 @@ Future<void> stopKioskMode() async {
                   );
                 } catch (e) {
                   if (!mounted) return;
-                  Navigator.pop(context); // close loading
+                  Navigator.pop(context); 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to generate quiz: $e')),
                   );
@@ -395,14 +395,11 @@ Future<void> stopKioskMode() async {
               _currentIndex = index;
             });
             if (index == 0) {
-              // Already on Home (DashboardScreen).
+              Navigator.pushNamed(context, '/dashboard');
             } else if (index == 1) {
               Navigator.pushNamed(context, '/teams');
             } else if (index == 2) {
               Navigator.pushNamed(context, '/calendar');
-            } else if (index == 3) {
-              // Navigate to Focus screen.
-              Navigator.pushNamed(context, '/focus');
             }
           },
           items: const [

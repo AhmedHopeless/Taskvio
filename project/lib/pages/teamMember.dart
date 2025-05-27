@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class TeamMembersPage extends StatefulWidget {
   final List<Map<String, dynamic>> teamMembers;
   final bool isLeader;
-  final int teamId; // Pass the team ID to know which team to update
+  final int teamId; 
 
   const TeamMembersPage({
     Key? key,
@@ -27,14 +27,14 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
   }
 
   Future<void> _removeMember(Map<String, dynamic> member) async {
-    // Remove from team_members table
+
     await Supabase.instance.client
         .from('team_user_rel')
         .delete()
         .eq('UID', member['UID'])
         .eq('TID', widget.teamId);
 
-    // Optionally, remove from TeamTask_user_rel and teamEvent_user_rel
+
     await Supabase.instance.client
         .from('TeamTask_user_rel')
         .delete()

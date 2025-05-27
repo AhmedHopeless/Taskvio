@@ -6,7 +6,6 @@ import 'package:project/pages/dashboard.dart';
 import 'package:project/pages/teams.dart';
 import 'package:project/pages/calendar.dart';
 import 'package:project/pages/focus.dart';
-import 'package:project/pages/settings.dart';
 import 'package:project/pages/team_dashboard.dart';
 import 'package:project/pages/splash_screen.dart';
 void main() async {
@@ -33,8 +32,7 @@ class MyApp extends StatelessWidget {
         '/dashboard': (context) => DashboardScreen(),
         '/teams': (context) => TeamsScreen(),
         '/calendar': (context) => CalendarScreen(),
-        '/focus': (context) => FocusModeScreen(),
-        '/settings': (context) => SettingsScreen(),
+        '/focus': (context) => FocusModeScreen()
       },
     );
   }

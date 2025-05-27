@@ -84,7 +84,7 @@ class _TeamDashboardState extends State<TeamDashboard> {
   }
 
   Future<void> _fetchTeamMembers() async {
-    // Step 1: Fetch team_user_rel UIDs
+
     final members = await Supabase.instance.client
         .from('team_user_rel')
         .select('UID, team_leader')
@@ -95,27 +95,26 @@ class _TeamDashboardState extends State<TeamDashboard> {
       return;
     }
 
-    // Step 2: Get list of UIDs
     final uids = members.map((e) => e['UID']).toList();
 
-    // Step 3: Fetch all matching profiles in one query
+
     final profilesList = await Supabase.instance.client
         .from('profiles')
         .select('id, name')
         .inFilter('id', uids) as List<dynamic>?;
 
-    // Convert to Map for faster lookup
+
     final Map<int, String> profilesMap = {
       for (var p in profilesList ?? [])
         if (p['id'] != null) p['id'] as int: p['name'] ?? ''
     };
 
-    // Debugging prints
+
     print('UIDs: $uids');
     print('Profiles List: $profilesList');
     print('Profiles Map: $profilesMap');
 
-    // Step 4: Merge profiles into members
+
     teamMembers = members.map<Map<String, dynamic>>((member) {
       final uid = member['UID'] as int;
       return {
@@ -141,7 +140,7 @@ class _TeamDashboardState extends State<TeamDashboard> {
   }
 
   Future<void> _fetchMyAssignedTasksEvents() async {
-    // Tasks
+
     final taskRels = await Supabase.instance.client
         .from('TeamTask_user_rel')
         .select('TaskID')
@@ -154,7 +153,7 @@ class _TeamDashboardState extends State<TeamDashboard> {
             .select()
             .inFilter('id', taskIds)
             .eq('TID', widget.tid) as List<dynamic>?;
-    // Events
+
     final eventRels = await Supabase.instance.client
         .from('teamEvent_user_rel')
         .select('Event_ID')
@@ -172,9 +171,7 @@ class _TeamDashboardState extends State<TeamDashboard> {
   }
 
 Future<void> deleteTeam() async {
-  // Only allow if the current user is the leader (check before calling this)
 
-  // Step 1: Delete related rows in TeamTask_user_rel
   await Supabase.instance.client
       .from('TeamTask_user_rel')
       .delete()
@@ -185,7 +182,7 @@ Future<void> deleteTeam() async {
           .map((task) => task['id'])
           .toList());
 
-  // Step 2: Delete related rows in teamEvent_user_rel
+
   await Supabase.instance.client
       .from('teamEvent_user_rel')
       .delete()
@@ -196,35 +193,33 @@ Future<void> deleteTeam() async {
           .map((event) => event['id'])
           .toList());
 
-  // Step 3: Delete rows in team_tasks
+
   await Supabase.instance.client
       .from('team_tasks')
       .delete()
       .eq('TID', widget.tid);
 
-  // Step 4: Delete rows in team_events
+
   await Supabase.instance.client
       .from('team_events')
       .delete()
       .eq('TID', widget.tid);
 
-  // Step 5: Delete rows in team_user_rel
   await Supabase.instance.client
       .from('team_user_rel')
       .delete()
       .eq('TID', widget.tid);
 
-  // Step 6: Delete the team itself
   await Supabase.instance.client
       .from('teams')
       .delete()
       .eq('id', widget.tid);
 
-  Navigator.pop(context, true); // Go back after deleting
+  Navigator.pop(context, true); 
 }
 
   Future<void> leaveTeam() async {
-    // Only allow if current user is NOT leader (check before calling this)
+
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
     final profile = await Supabase.instance.client
@@ -239,7 +234,7 @@ Future<void> deleteTeam() async {
         .delete()
         .eq('UID', profileId)
         .eq('TID', widget.tid);
-    Navigator.pop(context, true); // Go back after leaving
+    Navigator.pop(context, true); 
   }
 
   Future<void> editTeam(String newName, String newDescription) async {
@@ -247,7 +242,7 @@ Future<void> deleteTeam() async {
       'name': newName,
       'description': newDescription,
     }).eq('id', widget.tid);
-    await _fetchTeamInfo(); // Refresh local team info
+    await _fetchTeamInfo(); 
     setState(() {});
   }
 
@@ -297,18 +292,18 @@ Future<void> deleteTeam() async {
       builder: (context) => AlertDialog(
         title: Text(
           'Team Code',
-          style: TextStyle(fontSize: 24), // Bigger title text
+          style: TextStyle(fontSize: 24), 
         ),
         content: Text(
           'Your team code is: ${teamInfo?['code'] ?? 'N/A'}',
-          style: TextStyle(fontSize: 20), // Bigger content text
+          style: TextStyle(fontSize: 20), 
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Close',
-              style: TextStyle(fontSize: 18), // Bigger button text
+              style: TextStyle(fontSize: 18),
             ),
           ),
         ],
@@ -339,7 +334,7 @@ Future<void> deleteTeam() async {
         teamMembers.where((m) => m['team_leader'] != true).toList();
     final allMemberIds = assignableMembers.map((m) => m['UID'] as int).toList();
     List<int> selectedMemberIds =
-        List<int>.from(allMemberIds); // All checked by default
+        List<int>.from(allMemberIds); 
 
     await showDialog(
       context: context,
@@ -360,7 +355,6 @@ Future<void> deleteTeam() async {
                   decoration: InputDecoration(labelText: 'Description'),
                 ),
                 SizedBox(height: 12),
-                // Date pickers here...
                 TextField(
                   controller: TextEditingController(
                     text: _selectedStartDate == null
@@ -397,7 +391,7 @@ Future<void> deleteTeam() async {
                   },
                 ),
                 const SizedBox(height: 16),
-                // Due Date Field
+
                 TextField(
                   controller: TextEditingController(
                     text: _selectedEndDate == null
@@ -477,7 +471,7 @@ Future<void> deleteTeam() async {
                       .select()
                       .single();
                   final taskId = insertResult['id'];
-                  // Assign to selected members
+
                   for (final uid in selectedMemberIds) {
                     await Supabase.instance.client
                         .from('TeamTask_user_rel')
@@ -527,14 +521,14 @@ Future<void> deleteTeam() async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
     DateTime? eventDate;
-    DateTime? _selectedStartDate; // Define _selectedStartDate
-    DateTime? _selectedEndDate; // Define _selectedEndDate
+    DateTime? _selectedStartDate; 
+    DateTime? _selectedEndDate; 
     TimeOfDay? eventTime;
     final assignableMembers =
         teamMembers.where((m) => m['team_leader'] != true).toList();
     final allMemberIds = assignableMembers.map((m) => m['UID'] as int).toList();
     List<int> selectedMemberIds =
-        List<int>.from(allMemberIds); // All checked by default
+        List<int>.from(allMemberIds);
 
     await showDialog(
       context: context,
@@ -555,7 +549,6 @@ Future<void> deleteTeam() async {
                   decoration: InputDecoration(labelText: 'Description'),
                 ),
                 SizedBox(height: 12),
-                // Date and time pickers here...
                 TextField(
                   readOnly: true,
                   controller: TextEditingController(
@@ -579,7 +572,7 @@ Future<void> deleteTeam() async {
                   },
                 ),
                 const SizedBox(height: 16),
-                // Event Time Field
+
                 TextField(
                   readOnly: true,
                   controller: TextEditingController(
@@ -641,7 +634,7 @@ Future<void> deleteTeam() async {
                       .select()
                       .single();
                   final eventId = insertResult['id'];
-                  // Assign to selected members
+
                   for (final uid in selectedMemberIds) {
                     await Supabase.instance.client
                         .from('teamEvent_user_rel')
@@ -667,7 +660,7 @@ Future<void> deleteTeam() async {
         ),
       ),
     );
-    return true; // Ensure a boolean is always returned
+    return true;
   }
 
   Future<void> showEditTaskDialog(Map<String, dynamic> task) async {
@@ -869,7 +862,7 @@ Future<void> deleteTeam() async {
   }
 
   Future<void> _editTask(Map<String, dynamic> task) async {
-    // Show your edit dialog, then refresh
+
     await showEditTaskDialog(task);
     await _fetchAllTeamTasksEvents();
     _calculateTaskStats(teamTasks);
@@ -877,12 +870,12 @@ Future<void> deleteTeam() async {
   }
 
   Future<void> _deleteTask(Map<String, dynamic> task) async {
-    // First, delete all relations for this task
+
     await Supabase.instance.client
         .from('TeamTask_user_rel')
         .delete()
         .eq('TaskID', task['id']);
-    // Then, delete the task itself
+
     await Supabase.instance.client
         .from('team_tasks')
         .delete()
@@ -908,12 +901,12 @@ Future<void> deleteTeam() async {
   }
 
   Future<void> _deleteEvent(Map<String, dynamic> event) async {
-    // First, delete all relations for this event
+
     await Supabase.instance.client
         .from('teamEvent_user_rel')
         .delete()
         .eq('Event_ID', event['id']);
-    // Then, delete the event itself
+
     await Supabase.instance.client
         .from('team_events')
         .delete()
@@ -941,16 +934,13 @@ Future<void> deleteTeam() async {
   }
 
   Future<void> _markEventDone(Map<String, dynamic> event) async {
-    // Mark as complete
     await Supabase.instance.client
         .from('team_events')
         .update({'complete': true}).eq('id', event['id']);
-    // Delete relations first
     await Supabase.instance.client
         .from('teamEvent_user_rel')
         .delete()
         .eq('Event_ID', event['id']);
-    // Then delete the event
     await Supabase.instance.client
         .from('team_events')
         .delete()
@@ -1351,7 +1341,6 @@ class TaskCard extends StatelessWidget {
             ),
           ),
           SizedBox(width: 12),
-          // Expanded is a direct child of Row here
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1442,7 +1431,6 @@ class EventCard extends StatelessWidget {
             ),
           ),
           SizedBox(width: 12),
-          // Expanded is a direct child of Row here
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -100,10 +100,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final client = Supabase.instance.client;
     List<Appointment> appointments = [];
 
-    // Helper to adjust end time if needed
     DateTime adjustEndTime(DateTime start, DateTime? end) {
       if (end == null || !end.isAfter(start)) {
-        // If end is null or not after the start, add one hour
         return start.add(const Duration(hours: 1));
       }
       return end;
@@ -224,7 +222,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             start = DateTime.tryParse(dateStr);
           }
           if (start != null) {
-            final end = start.add(Duration(hours: 1)); // Default 1 hour duration
+            final end = start.add(Duration(hours: 1)); 
             appointments.add(Appointment(
               startTime: start,
               endTime: end,
@@ -235,9 +233,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           }
         }
       }
-
-    // Debug print to check appointments
-    print("Loaded appointments: $appointments");
 
     setState(() {
       _appointments = appointments;
@@ -290,8 +285,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           onTap: (CalendarTapDetails details) {
             if (details.targetElement == CalendarElement.calendarCell) {
               DateTime selectedDate = details.date!;
-              // TODO: Future - Navigate to detailed tasks/events page
-              print('Tapped on: $selectedDate');
             }
           },
         ),
@@ -310,7 +303,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: BottomNavigationBar(
           backgroundColor: Colors.white,
           type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.indigo, // Replace with your desired color
+          selectedItemColor: Colors.indigo, 
           unselectedItemColor: Colors.grey,
           showUnselectedLabels: true,
           iconSize: 28,
@@ -324,7 +317,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             } else if (index == 1) {
               Navigator.pushNamed(context, '/teams');
             } else if (index == 3) {
-              // Navigate to Focus screen.
               Navigator.pushNamed(context, '/focus');
             }
           },

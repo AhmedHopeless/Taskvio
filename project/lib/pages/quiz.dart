@@ -122,7 +122,7 @@ class _QuizScreenState extends State<QuizScreen> {
               ...widget.questions[_currentQuestionIndex]['options']
                   .map<Widget>((answer) => Container(
                         margin: const EdgeInsets.only(
-                            bottom: 12), // Adjust as needed
+                            bottom: 12),
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
