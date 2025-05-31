@@ -30,6 +30,7 @@ class _TasksScreenState extends State<TasksScreen> {
     setState(() {
       tasks = data?.cast<Map<String, dynamic>>() ?? [];
     });
+
   }
 
   Future<int?> _getProfileId() async {
@@ -62,6 +63,7 @@ class _TasksScreenState extends State<TasksScreen> {
   Future<void> _editTask(Map<String, dynamic> task) async {
     final titleController = TextEditingController(text: task['title']);
     final descController = TextEditingController(text: task['description']);
+    print('complete: ' + task['complete'].toString());
     DateTime? selectedDueDate = task['due_date'] != null
         ? DateTime.tryParse(task['due_date'])
         : null;

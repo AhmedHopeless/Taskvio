@@ -16,9 +16,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-
   int _currentIndex = 0;
-
 
   static const Color primaryColor = Color(0xFF4F5DD3);
   static const Color lightGreen = Color(0xFFDFF3E3);
@@ -90,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _notesController.text = event['description'] ?? '';
     _selectedStartDate = event['taskDate'];
     _selectedEndDate = event['dueDate'];
-    _editingEventId = event['id']; 
+    _editingEventId = event['id'];
     setState(() {
       _editingEventIndex = index;
       _showEventForm = true;
@@ -144,7 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TasksScreen(), 
+        builder: (_) => TasksScreen(),
       ),
     );
   }
@@ -153,7 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EventsScreen(), 
+        builder: (_) => EventsScreen(),
       ),
     );
   }
@@ -164,17 +162,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final TextEditingController _notesController = TextEditingController();
   DateTime? _selectedStartDate;
   DateTime? _selectedEndDate;
-  TimeOfDay? _selectedTime; 
-  final TextEditingController _timeController =
-      TextEditingController(); 
+  TimeOfDay? _selectedTime;
+  final TextEditingController _timeController = TextEditingController();
   String _selectedType = 'Task';
   List<Map<String, dynamic>> tasks = [];
   List<Map<String, dynamic>> events = [];
   bool _showTaskForm = false;
   bool _showEventForm = false;
   int? _editingTaskIndex;
-  int? _editingEventIndex; 
-  int? _editingTaskId; 
+  int? _editingEventIndex;
+  int? _editingTaskId;
   int? _editingEventId;
 
   Future<int?> _getProfileId() async {
@@ -215,15 +212,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final profileId = await _getProfileId();
     final today = DateTime.now();
     if (profileId == null) return;
- 
+
     final todayStr = today.toIso8601String().split('T').first;
     final data = await Supabase.instance.client
         .from('tasks')
-        .select('id, title, description, start_date, due_date, complete')
+        .select()
         .eq('UID', profileId)
         .lte('start_date', todayStr)
         .gte('due_date', todayStr) as List<dynamic>;
 
+    print(data);
     setState(() {
       tasks = data
               ?.map((e) => {
@@ -232,7 +230,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'description': e['description'],
                     'taskDate': DateTime.parse(e['start_date']),
                     'dueDate': DateTime.parse(e['due_date']),
-                    'completed': e['complete'],
+                    'complete': e['complete'],
                   })
               .toList() ??
           [];
@@ -310,7 +308,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'title': _titleController.text,
         'description': _notesController.text,
         'date': _selectedStartDate!.toIso8601String().split('T').first,
-        'time': formatTimeOfDay(_selectedTime!), 
+        'time': formatTimeOfDay(_selectedTime!),
         'complete': false,
         'UID': profileId,
       });
@@ -322,8 +320,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _logout() async {
     await Supabase.instance.client.auth.signOut();
-    Navigator.pushReplacementNamed(
-        context, '/login'); 
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   Widget _buildGreeting() {
@@ -345,82 +342,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // "Today's Goals" card.
-  Widget _buildTodaysGoalsCard() {
-    if (tasks.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: primaryColor,
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.adjust, color: Colors.white, size: 32),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  "No goals for today",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  "Add your first task",
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-              ],
-            )
-          ],
-        ),
-      );
-    } else {
-      int totalTasks = tasks.length;
-      int completedTasks =
-          tasks.where((task) => task['completed'] == true).length;
-      int percent =
-          totalTasks > 0 ? ((completedTasks / totalTasks) * 100).round() : 0;
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: primaryColor.withOpacity(0.8),
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.star, color: Colors.white, size: 32),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Today's Progress",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "$completedTasks of $totalTasks tasks completed ($percent%)",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-  }
 
- 
   Widget _buildCombinedGoalsCard() {
     int total = tasks.length + events.length;
     int completedTasks = tasks.where((t) => t['completed'] == true).length;
@@ -544,7 +466,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
- 
   Widget _statusCard(String title, String subtitle, {IconData? icon}) {
     return Expanded(
       child: Container(
@@ -787,7 +708,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
   Widget _buildInlineEventForm() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
@@ -907,10 +827,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       );
                       if (pickedTime != null) {
                         setState(() {
-                          _selectedTime =
-                              pickedTime; 
-                          _timeController.text =
-                              pickedTime.format(context); 
+                          _selectedTime = pickedTime;
+                          _timeController.text = pickedTime.format(context);
                         });
                       }
                     },
@@ -1022,25 +940,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
             itemCount: previewCount,
             itemBuilder: (context, index) {
               final task = tasks[index];
+              print(task['complete']);
+              final isComplete = task['complete'] ?? false;
+              print(isComplete);
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(borderRadius),
                 ),
                 child: ListTile(
-                  title: Text(task['title'], style: GoogleFonts.poppins()),
+                  title: Text(
+                    task['title'] ?? '',
+                    style: GoogleFonts.poppins(
+                      decoration: isComplete
+                          ? TextDecoration
+                              .lineThrough // Strike-through if complete
+                          : TextDecoration.none, // Normal text if not complete
+                    ),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         task['description'] ?? '',
-                        style: GoogleFonts.poppins(fontSize: 12),
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          decoration: isComplete
+                              ? TextDecoration
+                                  .lineThrough // Strike-through if complete
+                              : TextDecoration
+                                  .none, // Normal text if not complete
+                        ),
                       ),
                       if (task['dueDate'] != null)
                         Text(
                           "Due date: ${_formatDateTime(task['dueDate'])}",
                           style: GoogleFonts.poppins(
-                              fontSize: 12, color: Colors.grey),
+                            fontSize: 12,
+                            color: Colors.grey,
+                            decoration: isComplete
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
+                          ),
                         ),
                     ],
                   ),
@@ -1306,7 +1247,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: FutureBuilder<String>(
-              future: _fetchFirstName(), 
+              future: _fetchFirstName(),
               builder: (context, snapshot) {
                 String name = snapshot.data ?? "User";
                 String initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
@@ -1462,7 +1403,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _currentIndex = index;
             });
             if (index == 0) {
-              
             } else if (index == 1) {
               Navigator.pushNamed(context, '/teams');
             } else if (index == 2) {

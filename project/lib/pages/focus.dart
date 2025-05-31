@@ -26,36 +26,33 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
   File? _uploadedFile;
   List<String> _exceptionPackages = ['com.android.dialer'];
 
-
-
   Future<void> ensureDeviceAdminPermission() async {
-  const platform = MethodChannel('com.example.project/lock');
-  try {
-    await platform.invokeMethod('requestAdmin');
-  } on PlatformException catch (e) {
-    print('Error requesting device admin permission: $e');
+    const platform = MethodChannel('com.example.project/lock');
+    try {
+      await platform.invokeMethod('requestAdmin');
+    } on PlatformException catch (e) {
+      print('Error requesting device admin permission: $e');
+    }
   }
-}
 
-Future<void> startKioskMode() async {
-  const platform = MethodChannel('com.example.project/lock');
-  try {
-    await ensureDeviceAdminPermission();
-    await platform.invokeMethod('startKiosk');
-  } catch (e) {
-    print('Failed to start kiosk mode: $e');
+  Future<void> startKioskMode() async {
+    const platform = MethodChannel('com.example.project/lock');
+    try {
+      await ensureDeviceAdminPermission();
+      await platform.invokeMethod('startKiosk');
+    } catch (e) {
+      print('Failed to start kiosk mode: $e');
+    }
   }
-}
 
-Future<void> stopKioskMode() async {
-  const platform = MethodChannel('com.example.project/lock');
-  try {
-    await platform.invokeMethod('stopKiosk');
-  } catch (e) {
-    print('Failed to stop kiosk mode: $e');
+  Future<void> stopKioskMode() async {
+    const platform = MethodChannel('com.example.project/lock');
+    try {
+      await platform.invokeMethod('stopKiosk');
+    } catch (e) {
+      print('Failed to stop kiosk mode: $e');
+    }
   }
-}
-
 
   void _pickFocusTime() async {
     int? selectedTime = await showDialog<int>(
@@ -81,7 +78,8 @@ Future<void> stopKioskMode() async {
                       });
                     },
                   ),
-                  Text('$minutes minutes', style: GoogleFonts.poppins(fontSize: 18))
+                  Text('$minutes minutes',
+                      style: GoogleFonts.poppins(fontSize: 18))
                 ],
               );
             },
@@ -110,35 +108,37 @@ Future<void> stopKioskMode() async {
   }
 
   void _startFocus() async {
-  setState(() {
-    _isFocusRunning = true;
-  });
+    setState(() {
+      _isFocusRunning = true;
+    });
 
-  if (!_exceptionPackages.any((pkg) => pkg.contains('dialer') || pkg.contains('phone'))) {
-    _exceptionPackages.add('com.android.dialer');
-  }
-
-  await startKioskMode();
-
-  _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-    if (_remainingSeconds == 0) {
-      timer.cancel();
-      _onFocusEnd();
-    } else {
-      setState(() {
-        _remainingSeconds--;
-      });
+    if (!_exceptionPackages
+        .any((pkg) => pkg.contains('dialer') || pkg.contains('phone'))) {
+      _exceptionPackages.add('com.android.dialer');
     }
-  });
-}
 
+    await startKioskMode();
+
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (_remainingSeconds == 0) {
+        timer.cancel();
+        _onFocusEnd();
+      } else {
+        setState(() {
+          _remainingSeconds--;
+        });
+      }
+    });
+  }
 
   void _onFocusEnd() async {
     setState(() {
       _isFocusRunning = false;
     });
     await stopKioskMode();
-    _showQuizDialog();
+    if (_uploadedFile != null) {
+      _showQuizDialog();
+    }
   }
 
   void _stopFocus() async {
@@ -149,7 +149,10 @@ Future<void> stopKioskMode() async {
       _remainingSeconds = 0;
     });
     await stopKioskMode();
-    _showQuizDialog();
+    if (_uploadedFile != null) {
+      _showQuizDialog();
+    }
+    
   }
 
   Future<void> _pickFile() async {
@@ -182,17 +185,22 @@ Future<void> stopKioskMode() async {
                 final app = apps[index];
                 final pkg = app.packageName;
 
-                final isDefaultPhoneApp = pkg.contains('dialer') || pkg.contains('phone');
-                final isSelected = _exceptionPackages.contains(pkg) || isDefaultPhoneApp;
+                final isDefaultPhoneApp =
+                    pkg.contains('dialer') || pkg.contains('phone');
+                final isSelected =
+                    _exceptionPackages.contains(pkg) || isDefaultPhoneApp;
 
                 return ListTile(
                   leading: app.icon != null
-                      ? Image.memory(app.icon!, width: 32, height: 32, fit: BoxFit.contain)
+                      ? Image.memory(app.icon!,
+                          width: 32, height: 32, fit: BoxFit.contain)
                       : null,
                   title: Text(app.name, style: GoogleFonts.poppins()),
-                  trailing: isSelected ? Icon(Icons.check, color: Colors.green) : null,
+                  trailing: isSelected
+                      ? Icon(Icons.check, color: Colors.green)
+                      : null,
                   onTap: isDefaultPhoneApp
-                      ? null 
+                      ? null
                       : () {
                           setState(() {
                             if (_exceptionPackages.contains(pkg)) {
@@ -212,15 +220,14 @@ Future<void> stopKioskMode() async {
     );
   }
 
-
-
   void _showQuizDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         title: Text('Focus Complete!', style: GoogleFonts.poppins()),
-        content: Text('Would you like to take a quiz on your uploaded file?', style: GoogleFonts.poppins()),
+        content: Text('Would you like to take a quiz on your uploaded file?',
+            style: GoogleFonts.poppins()),
         actions: [
           TextButton(
             onPressed: () {
@@ -239,20 +246,23 @@ Future<void> stopKioskMode() async {
                   builder: (_) => Center(child: CircularProgressIndicator()),
                 );
 
-                final quizService = QuizGeneratorService(apiKey: "");
+                final quizService = QuizGeneratorService(
+                    apiKey: "");
                 try {
-                  final quizQuestions = await quizService.generateQuizFromPdf(_uploadedFile!);
+                  final quizQuestions =
+                      await quizService.generateQuizFromPdf(_uploadedFile!);
                   if (!mounted) return;
-                  Navigator.pop(context); 
+                  Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => QuizScreen(questions: quizQuestions),
+                      builder: (context) =>
+                          QuizScreen(questions: quizQuestions),
                     ),
                   );
                 } catch (e) {
                   if (!mounted) return;
-                  Navigator.pop(context); 
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to generate quiz: $e')),
                   );
@@ -301,7 +311,9 @@ Future<void> stopKioskMode() async {
           backgroundColor: Colors.white,
           automaticallyImplyLeading: false,
           elevation: 0,
-          title: Text("Focus Mode", style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold)),
+          title: Text("Focus Mode",
+              style: GoogleFonts.poppins(
+                  color: Colors.black, fontWeight: FontWeight.bold)),
         ),
         body: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -315,7 +327,10 @@ Future<void> stopKioskMode() async {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
-                        BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 10, offset: Offset(0, 4))
+                        BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: Offset(0, 4))
                       ],
                     ),
                     child: Column(
@@ -323,13 +338,18 @@ Future<void> stopKioskMode() async {
                       children: [
                         Text(
                           _formatDuration(_remainingSeconds),
-                          style: GoogleFonts.poppins(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.indigo),
+                          style: GoogleFonts.poppins(
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.indigo),
                         ),
                         SizedBox(height: 20),
                         _isFocusRunning
                             ? ElevatedButton(
                                 onPressed: _stopFocus,
-                                child: Text('End Focus', style: GoogleFonts.poppins(color: Colors.white)),
+                                child: Text('End Focus',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.white)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.redAccent,
                                   minimumSize: Size(double.infinity, 50),
@@ -337,7 +357,9 @@ Future<void> stopKioskMode() async {
                               )
                             : ElevatedButton(
                                 onPressed: _pickFocusTime,
-                                child: Text('Set Focus Time', style: GoogleFonts.poppins(color: Colors.white)),
+                                child: Text('Set Focus Time',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.white)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.indigo,
                                   minimumSize: Size(double.infinity, 50),
@@ -364,64 +386,68 @@ Future<void> stopKioskMode() async {
                     padding: const EdgeInsets.only(top: 10.0),
                     child: Text(
                       'Uploaded: ${_uploadedFile!.path.split('/').last}',
-                      style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, color: Colors.grey[700]),
                     ),
                   ),
               ]
             ],
           ),
         ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-          boxShadow: [
-            BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8),
-          ],
-        ),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.white,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.indigo,
-          unselectedItemColor: Colors.grey,
-          showUnselectedLabels: true,
-          iconSize: 28,
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-            if (index == 0) {
-              Navigator.pushNamed(context, '/dashboard');
-            } else if (index == 1) {
-              Navigator.pushNamed(context, '/teams');
-            } else if (index == 2) {
-              Navigator.pushNamed(context, '/calendar');
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.group),
-              label: 'Teams',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today),
-              label: 'Calendar',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.menu_book_outlined),
-              label: 'Focus',
-            ),
-          ],
-        ),
-      ),
+        bottomNavigationBar: !_isFocusRunning
+            ? Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.grey.withOpacity(0.2), blurRadius: 8),
+                  ],
+                ),
+                child: BottomNavigationBar(
+                  backgroundColor: Colors.white,
+                  type: BottomNavigationBarType.fixed,
+                  selectedItemColor: Colors.indigo,
+                  unselectedItemColor: Colors.grey,
+                  showUnselectedLabels: true,
+                  iconSize: 28,
+                  currentIndex: _currentIndex,
+                  onTap: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                    if (index == 0) {
+                      Navigator.pushNamed(context, '/dashboard');
+                    } else if (index == 1) {
+                      Navigator.pushNamed(context, '/teams');
+                    } else if (index == 2) {
+                      Navigator.pushNamed(context, '/calendar');
+                    }
+                  },
+                  items: const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.home),
+                      label: 'Home',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.group),
+                      label: 'Teams',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.calendar_today),
+                      label: 'Calendar',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.menu_book_outlined),
+                      label: 'Focus',
+                    ),
+                  ],
+                ),
+              )
+            : null,
       ),
     );
   }
